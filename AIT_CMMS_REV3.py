@@ -1770,7 +1770,225 @@ def generate_monthly_summary_report(conn, month=None, year=None):
             hours_display = f"{hours:.1f}h" if hours else "0.0h"
             print(f"{location:<30} {count:<15} {hours_display:<12}")
         print()
-    
+
+    # ==================== EQUIPMENT MISSING PARTS SUMMARY ====================
+    print()
+    print("=" * 80)
+    print("EQUIPMENT WITH MISSING PARTS SUMMARY")
+    print("=" * 80)
+    print()
+
+    # Get Equipment Missing Parts statistics
+    # Entries reported this month
+    cursor.execute('''
+        SELECT COUNT(*)
+        FROM equipment_missing_parts
+        WHERE EXTRACT(YEAR FROM reported_date::date) = %s
+        AND EXTRACT(MONTH FROM reported_date::date) = %s
+    ''', (year, month))
+
+    emp_reported = cursor.fetchone()[0] or 0
+
+    # Entries closed this month
+    cursor.execute('''
+        SELECT COUNT(*)
+        FROM equipment_missing_parts
+        WHERE EXTRACT(YEAR FROM closed_date::date) = %s
+        AND EXTRACT(MONTH FROM closed_date::date) = %s
+        AND status = 'Closed'
+    ''', (year, month))
+
+    emp_closed = cursor.fetchone()[0] or 0
+
+    # Currently open entries
+    cursor.execute('''
+        SELECT COUNT(*)
+        FROM equipment_missing_parts
+        WHERE status = 'Open'
+    ''')
+
+    emp_open_current = cursor.fetchone()[0] or 0
+
+    # Display summary statistics
+    print(f"  Entries Reported This Month: {emp_reported}")
+    print(f"  Entries Closed This Month: {emp_closed}")
+    print(f"  Currently Open Entries: {emp_open_current}")
+    print()
+
+    # Detailed breakdown of entries reported this month
+    if emp_reported > 0:
+        print("=" * 100)
+        print(f"DETAILED BREAKDOWN: EQUIPMENT MISSING PARTS REPORTED IN {month_name.upper()} {year}")
+        print("=" * 100)
+        print()
+
+        cursor.execute('''
+            SELECT
+                emp_number,
+                bfm_equipment_no,
+                description,
+                missing_parts_description,
+                priority,
+                assigned_technician,
+                reported_date,
+                status
+            FROM equipment_missing_parts
+            WHERE EXTRACT(YEAR FROM reported_date::date) = %s
+            AND EXTRACT(MONTH FROM reported_date::date) = %s
+            ORDER BY reported_date
+        ''', (year, month))
+
+        reported_emps = cursor.fetchall()
+
+        for emp_data in reported_emps:
+            emp_number, equipment, description, missing_parts, priority, technician, reported_date, status = emp_data
+
+            # Format dates - handle both string and datetime objects
+            if reported_date:
+                reported_str = reported_date.strftime('%Y-%m-%d') if hasattr(reported_date, 'strftime') else str(reported_date)[:10]
+            else:
+                reported_str = "Unknown"
+
+            tech_name = technician if technician else "Unassigned"
+            equip_str = equipment if equipment else "N/A"
+            desc_str = (description[:60] + "...") if description and len(description) > 60 else (description or "No description")
+            priority_str = priority if priority else "N/A"
+            parts_str = (missing_parts[:80] + "...") if missing_parts and len(missing_parts) > 80 else (missing_parts or "N/A")
+            status_str = status if status else "Open"
+
+            print(f"EMP Number: {emp_number}")
+            print(f"  Priority: {priority_str}")
+            print(f"  Status: {status_str}")
+            print(f"  Equipment: {equip_str}")
+            print(f"  Description: {desc_str}")
+            print(f"  Missing Parts: {parts_str}")
+            print(f"  Reported Date: {reported_str}")
+            print(f"  Assigned Technician: {tech_name}")
+            print("-" * 100)
+            print()
+
+        print("=" * 100)
+        print()
+
+    # Detailed breakdown of entries closed this month
+    if emp_closed > 0:
+        print("=" * 100)
+        print(f"DETAILED BREAKDOWN: EQUIPMENT MISSING PARTS CLOSED IN {month_name.upper()} {year}")
+        print("=" * 100)
+        print()
+
+        cursor.execute('''
+            SELECT
+                emp_number,
+                bfm_equipment_no,
+                description,
+                missing_parts_description,
+                priority,
+                assigned_technician,
+                reported_date,
+                closed_date,
+                closed_by
+            FROM equipment_missing_parts
+            WHERE EXTRACT(YEAR FROM closed_date::date) = %s
+            AND EXTRACT(MONTH FROM closed_date::date) = %s
+            AND status = 'Closed'
+            ORDER BY closed_date
+        ''', (year, month))
+
+        closed_emps = cursor.fetchall()
+
+        for emp_data in closed_emps:
+            emp_number, equipment, description, missing_parts, priority, technician, reported_date, closed_date, closed_by = emp_data
+
+            # Format dates
+            if reported_date:
+                reported_str = reported_date.strftime('%Y-%m-%d') if hasattr(reported_date, 'strftime') else str(reported_date)[:10]
+            else:
+                reported_str = "Unknown"
+
+            if closed_date:
+                closed_str = closed_date.strftime('%Y-%m-%d') if hasattr(closed_date, 'strftime') else str(closed_date)[:10]
+            else:
+                closed_str = "Unknown"
+
+            tech_name = technician if technician else "Unassigned"
+            equip_str = equipment if equipment else "N/A"
+            desc_str = (description[:60] + "...") if description and len(description) > 60 else (description or "No description")
+            priority_str = priority if priority else "N/A"
+            parts_str = (missing_parts[:80] + "...") if missing_parts and len(missing_parts) > 80 else (missing_parts or "N/A")
+            closer_name = closed_by if closed_by else "Unknown"
+
+            print(f"EMP Number: {emp_number}")
+            print(f"  Priority: {priority_str}")
+            print(f"  Equipment: {equip_str}")
+            print(f"  Description: {desc_str}")
+            print(f"  Missing Parts: {parts_str}")
+            print(f"  Reported Date: {reported_str}")
+            print(f"  Closed Date: {closed_str}")
+            print(f"  Assigned Technician: {tech_name}")
+            print(f"  Closed By: {closer_name}")
+            print("-" * 100)
+            print()
+
+        print("=" * 100)
+        print()
+
+    # Currently open entries
+    if emp_open_current > 0:
+        print("=" * 100)
+        print(f"CURRENTLY OPEN EQUIPMENT MISSING PARTS ENTRIES")
+        print("=" * 100)
+        print()
+
+        cursor.execute('''
+            SELECT
+                emp_number,
+                bfm_equipment_no,
+                description,
+                missing_parts_description,
+                priority,
+                assigned_technician,
+                reported_date,
+                (CURRENT_DATE - reported_date::date) as days_open
+            FROM equipment_missing_parts
+            WHERE status = 'Open'
+            ORDER BY reported_date
+        ''')
+
+        open_emps = cursor.fetchall()
+
+        for emp_data in open_emps:
+            emp_number, equipment, description, missing_parts, priority, technician, reported_date, days_open = emp_data
+
+            # Format dates
+            if reported_date:
+                reported_str = reported_date.strftime('%Y-%m-%d') if hasattr(reported_date, 'strftime') else str(reported_date)[:10]
+            else:
+                reported_str = "Unknown"
+
+            current_date_str = datetime.now().strftime('%Y-%m-%d')
+            tech_name = technician if technician else "Unassigned"
+            equip_str = equipment if equipment else "N/A"
+            desc_str = (description[:60] + "...") if description and len(description) > 60 else (description or "No description")
+            priority_str = priority if priority else "N/A"
+            parts_str = (missing_parts[:80] + "...") if missing_parts and len(missing_parts) > 80 else (missing_parts or "N/A")
+
+            print(f"EMP Number: {emp_number}")
+            print(f"  Priority: {priority_str}")
+            print(f"  Equipment: {equip_str}")
+            print(f"  Description: {desc_str}")
+            print(f"  Missing Parts: {parts_str}")
+            print(f"  Reported Date: {reported_str}")
+            print(f"  Days Open: {days_open} days (as of {current_date_str})")
+            print(f"  Assigned Technician: {tech_name}")
+            print("-" * 100)
+            print()
+
+        print("=" * 100)
+        print()
+
+    print()
+
     print("=" * 80)
     print("END OF MONTHLY SUMMARY REPORT")
     print("=" * 80)
@@ -8350,6 +8568,43 @@ class AITCMMSSystem:
                 )
             ''')
 
+            # Equipment Missing Parts table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS equipment_missing_parts (
+                    id SERIAL PRIMARY KEY,
+                    emp_number TEXT UNIQUE,
+                    bfm_equipment_no TEXT,
+                    description TEXT,
+                    location TEXT,
+                    reported_by TEXT,
+                    reported_date TEXT,
+                    priority TEXT,
+                    status TEXT DEFAULT 'Open',
+                    assigned_technician TEXT,
+                    missing_parts_description TEXT,
+                    notes TEXT,
+                    closed_date TEXT,
+                    closed_by TEXT,
+                    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (bfm_equipment_no) REFERENCES equipment (bfm_equipment_no)
+                )
+            ''')
+
+            # Create indexes for equipment_missing_parts table for better performance
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_emp_status ON equipment_missing_parts(status)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_emp_technician ON equipment_missing_parts(assigned_technician)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_emp_priority ON equipment_missing_parts(priority)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_emp_reported_date ON equipment_missing_parts(reported_date)
+            ''')
+
             # Ensure FK uses ON DELETE CASCADE so linked part requests are removed with the CM
             try:
                 cursor.execute('''
@@ -10574,8 +10829,20 @@ class AITCMMSSystem:
         self.cm_filter_dropdown.bind('<<ComboboxSelected>>', self.filter_cm_list)
     
         # Clear filter button
-        ttk.Button(filter_frame, text="Clear Filter", 
+        ttk.Button(filter_frame, text="Clear Filter",
                 command=self.clear_cm_filter).pack(side='left', padx=5)
+
+        # Second row of controls for Equipment Missing Parts
+        controls_row2 = ttk.Frame(controls_frame)
+        controls_row2.pack(fill='x', pady=(5, 0))
+
+        ttk.Label(controls_row2, text="Equipment Missing Parts:").pack(side='left', padx=(0, 5))
+        ttk.Button(controls_row2, text="Report Missing Parts",
+                command=self.create_missing_parts_dialog).pack(side='left', padx=5)
+        ttk.Button(controls_row2, text="Edit Missing Parts Entry",
+                command=self.edit_missing_parts_dialog).pack(side='left', padx=5)
+        ttk.Button(controls_row2, text="Close Missing Parts Entry",
+                command=self.close_missing_parts_dialog).pack(side='left', padx=5)
 
         # CM list with enhanced columns for SharePoint data
         cm_list_frame = ttk.LabelFrame(self.cm_frame, text="Corrective Maintenance List", padding=10)
@@ -10613,12 +10880,52 @@ class AITCMMSSystem:
 
         cm_list_frame.grid_rowconfigure(0, weight=1)
         cm_list_frame.grid_columnconfigure(0, weight=1)
-        
+
         # Initialize filter data storage
         self.cm_original_data = []
-        
+
         # Load CM data
         self.load_corrective_maintenance_with_filter()
+
+        # Equipment Missing Parts list section
+        emp_list_frame = ttk.LabelFrame(self.cm_frame, text="Equipment with Missing Parts", padding=10)
+        emp_list_frame.pack(fill='both', expand=True, padx=10, pady=5)
+
+        # Treeview for missing parts entries
+        self.emp_tree = ttk.Treeview(emp_list_frame,
+                                columns=('EMP Number', 'BFM', 'Description', 'Priority', 'Assigned', 'Status', 'Reported Date', 'Missing Parts'),
+                                show='headings')
+
+        emp_columns = {
+            'EMP Number': 120,
+            'BFM': 120,
+            'Description': 200,
+            'Priority': 80,
+            'Assigned': 120,
+            'Status': 80,
+            'Reported Date': 100,
+            'Missing Parts': 300
+        }
+
+        for col, width in emp_columns.items():
+            self.emp_tree.heading(col, text=col)
+            self.emp_tree.column(col, width=width)
+
+        # Scrollbars for missing parts list
+        emp_v_scrollbar = ttk.Scrollbar(emp_list_frame, orient='vertical', command=self.emp_tree.yview)
+        emp_h_scrollbar = ttk.Scrollbar(emp_list_frame, orient='horizontal', command=self.emp_tree.xview)
+        self.emp_tree.configure(yscrollcommand=emp_v_scrollbar.set, xscrollcommand=emp_h_scrollbar.set)
+
+        # Pack treeview and scrollbars
+        self.emp_tree.grid(row=0, column=0, sticky='nsew')
+        emp_v_scrollbar.grid(row=0, column=1, sticky='ns')
+        emp_h_scrollbar.grid(row=1, column=0, sticky='ew')
+
+        emp_list_frame.grid_rowconfigure(0, weight=1)
+        emp_list_frame.grid_columnconfigure(0, weight=1)
+
+        # Load Equipment Missing Parts data
+        self.load_missing_parts_list()
 
     def load_corrective_maintenance_with_filter(self):
         """Wrapper for your existing load method that adds filter support"""
@@ -10941,12 +11248,46 @@ class AITCMMSSystem:
             
         except Exception as e:
             print(f"Error loading corrective maintenance: {e}")
-        
-    
 
-    
-    
-    
+
+    def load_missing_parts_list(self):
+        """Load equipment missing parts data"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT emp_number, bfm_equipment_no, description, priority,
+                    assigned_technician, status, reported_date, missing_parts_description
+                FROM equipment_missing_parts
+                ORDER BY reported_date DESC
+            ''')
+
+            # Clear existing items
+            for item in self.emp_tree.get_children():
+                self.emp_tree.delete(item)
+
+            # Add missing parts records
+            for idx, emp in enumerate(cursor.fetchall()):
+                emp_number, bfm_no, description, priority, assigned, status, reported_date, missing_parts = emp
+
+                # Truncate description and missing parts for display
+                display_desc = (description[:47] + '...') if description and len(description) > 50 else (description or '')
+                display_parts = (missing_parts[:97] + '...') if missing_parts and len(missing_parts) > 100 else (missing_parts or '')
+
+                self.emp_tree.insert('', 'end', values=(
+                    emp_number, bfm_no, display_desc, priority, assigned, status, reported_date, display_parts
+                ))
+
+                # Yield to event loop every 50 items to keep UI responsive
+                if idx % 50 == 0:
+                    self.root.update_idletasks()
+
+        except Exception as e:
+            print(f"Error loading equipment missing parts: {e}")
+            messagebox.showerror("Error", f"Failed to load equipment missing parts: {e}")
+
+
+
+
     def create_analytics_dashboard_tab(self):
         """Analytics and dashboard tab"""
         self.analytics_frame = ttk.Frame(self.notebook)
@@ -12987,11 +13328,578 @@ class AITCMMSSystem:
         
         ttk.Button(button_frame, text="Create CM", command=validate_and_save_cm).pack(side='left', padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side='left', padx=5)
-        
-    
-    
-    
-    
+
+
+    def create_missing_parts_dialog(self):
+        """Create new Equipment Missing Parts entry"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Report Equipment with Missing Parts")
+        dialog.geometry("650x700")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Generate next EMP number in format EMP-YYYYMMDD-XXXX
+        cursor = self.conn.cursor()
+        today = datetime.now().strftime('%Y%m%d')
+        cursor.execute(
+            "SELECT MAX(CAST(SPLIT_PART(emp_number, '-', 3) AS INTEGER)) "
+            "FROM equipment_missing_parts "
+            "WHERE emp_number LIKE %s",
+            (f'EMP-{today}-%',)
+        )
+        result = cursor.fetchone()[0]
+        next_seq = (result + 1) if result else 1
+        next_emp_num = f"EMP-{today}-{next_seq:04d}"
+
+        row = 0
+
+        # EMP Number (auto-generated, read-only)
+        ttk.Label(dialog, text="EMP Number:", font=('Arial', 10, 'bold')).grid(row=row, column=0, sticky='w', padx=10, pady=5)
+        emp_number_var = tk.StringVar(value=next_emp_num)
+        ttk.Entry(dialog, textvariable=emp_number_var, width=20, state='readonly').grid(row=row, column=1, sticky='w', padx=10, pady=5)
+        row += 1
+
+        # Date Picker
+        ttk.Label(dialog, text="Reported Date:", font=('Arial', 10)).grid(row=row, column=0, sticky='w', padx=10, pady=5)
+
+        date_frame = ttk.Frame(dialog)
+        date_frame.grid(row=row, column=1, sticky='w', padx=10, pady=5)
+
+        emp_date_var = tk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
+        date_entry = ttk.Entry(date_frame, textvariable=emp_date_var, width=15)
+        date_entry.pack(side='left', padx=(0, 5))
+
+        def open_calendar():
+            """Open calendar dialog to pick a date"""
+            from tkcalendar import Calendar
+
+            cal_dialog = tk.Toplevel(dialog)
+            cal_dialog.title("Select Date")
+            cal_dialog.geometry("300x300")
+            cal_dialog.transient(dialog)
+            cal_dialog.grab_set()
+
+            try:
+                current_date = datetime.strptime(emp_date_var.get(), '%Y-%m-%d')
+            except:
+                current_date = datetime.now()
+
+            cal = Calendar(cal_dialog,
+                          selectmode='day',
+                          year=current_date.year,
+                          month=current_date.month,
+                          day=current_date.day,
+                          date_pattern='yyyy-mm-dd')
+            cal.pack(pady=20, padx=20, fill='both', expand=True)
+
+            def select_date():
+                emp_date_var.set(cal.get_date())
+                cal_dialog.destroy()
+
+            button_frame_cal = ttk.Frame(cal_dialog)
+            button_frame_cal.pack(pady=10)
+            ttk.Button(button_frame_cal, text="Select", command=select_date).pack(side='left', padx=5)
+            ttk.Button(button_frame_cal, text="Today",
+                    command=lambda: [emp_date_var.set(datetime.now().strftime('%Y-%m-%d')),
+                                    cal_dialog.destroy()]).pack(side='left', padx=5)
+            ttk.Button(button_frame_cal, text="Cancel", command=cal_dialog.destroy).pack(side='left', padx=5)
+
+        ttk.Button(date_frame, text="Pick Date", command=open_calendar).pack(side='left')
+        ttk.Label(dialog, text="Format: YYYY-MM-DD",
+                font=('Arial', 8), foreground='gray').grid(row=row, column=2, sticky='w', padx=5)
+        row += 1
+
+        # Equipment Selection
+        ttk.Label(dialog, text="Equipment (BFM):").grid(row=row, column=0, sticky='w', padx=10, pady=5)
+        bfm_var = tk.StringVar()
+
+        cursor.execute("SELECT DISTINCT bfm_equipment_no FROM equipment WHERE status = 'Active' ORDER BY bfm_equipment_no")
+        equipment_list = [row_data[0] for row_data in cursor.fetchall()]
+
+        bfm_combo = ttk.Combobox(dialog, textvariable=bfm_var, values=equipment_list, width=20)
+        bfm_combo.grid(row=row, column=1, sticky='w', padx=10, pady=5)
+        row += 1
+
+        # Description
+        ttk.Label(dialog, text="Description:").grid(row=row, column=0, sticky='nw', padx=10, pady=5)
+        description_text = tk.Text(dialog, width=40, height=4)
+        description_text.grid(row=row, column=1, columnspan=2, sticky='w', padx=10, pady=5)
+        row += 1
+
+        # Missing Parts Description (The key differentiator)
+        ttk.Label(dialog, text="Missing Parts:", font=('Arial', 10, 'bold')).grid(row=row, column=0, sticky='nw', padx=10, pady=5)
+        ttk.Label(dialog, text="(List all missing parts)", font=('Arial', 8), foreground='gray').grid(row=row, column=1, sticky='w', padx=10, pady=0)
+        row += 1
+        missing_parts_text = tk.Text(dialog, width=40, height=6)
+        missing_parts_text.grid(row=row, column=1, columnspan=2, sticky='w', padx=10, pady=5)
+        row += 1
+
+        # Priority
+        ttk.Label(dialog, text="Priority:").grid(row=row, column=0, sticky='w', padx=10, pady=5)
+        priority_var = tk.StringVar(value="Medium")
+        priority_combo = ttk.Combobox(dialog, textvariable=priority_var,
+                                    values=["Low", "Medium", "High", "Critical"],
+                                    state="readonly", width=20)
+        priority_combo.grid(row=row, column=1, sticky='w', padx=10, pady=5)
+        row += 1
+
+        # Assigned Technician
+        ttk.Label(dialog, text="Assigned Technician:").grid(row=row, column=0, sticky='w', padx=10, pady=5)
+        assigned_var = tk.StringVar()
+
+        if self.current_user_role == 'Technician':
+            assigned_var.set(self.user_name)
+            assigned_entry = ttk.Entry(dialog, textvariable=assigned_var, width=20, state='readonly')
+            assigned_entry.grid(row=row, column=1, sticky='w', padx=10, pady=5)
+        else:
+            assigned_combo = ttk.Combobox(dialog, textvariable=assigned_var,
+                                        values=self.technicians, width=20)
+            assigned_combo.grid(row=row, column=1, sticky='w', padx=10, pady=5)
+        row += 1
+
+        # Notes (Optional)
+        ttk.Label(dialog, text="Additional Notes:").grid(row=row, column=0, sticky='nw', padx=10, pady=5)
+        notes_text = tk.Text(dialog, width=40, height=4)
+        notes_text.grid(row=row, column=1, columnspan=2, sticky='w', padx=10, pady=5)
+        row += 1
+
+        def validate_and_save_emp():
+            """Validate and save the missing parts entry"""
+            try:
+                emp_date_input = emp_date_var.get().strip()
+
+                if not emp_date_input:
+                    messagebox.showerror("Error", "Please enter a reported date")
+                    return
+
+                try:
+                    parsed_date = datetime.strptime(emp_date_input, '%Y-%m-%d')
+
+                    if parsed_date > datetime.now() + timedelta(days=1):
+                        result = messagebox.askyesno("Future Date Warning",
+                                                f"The date '{emp_date_input}' is in the future.\n\n"
+                                                f"Are you sure this is correct?")
+                        if not result:
+                            return
+
+                    if parsed_date < datetime.now() - timedelta(days=365):
+                        result = messagebox.askyesno("Old Date Warning",
+                                                f"The date '{emp_date_input}' is more than 1 year ago.\n\n"
+                                                f"Are you sure this is correct?")
+                        if not result:
+                            return
+
+                    validated_date = parsed_date.strftime('%Y-%m-%d')
+
+                except ValueError:
+                    messagebox.showerror("Invalid Date Format",
+                                    f"Please enter the date in YYYY-MM-DD format.\n\n"
+                                    f"Examples:\n"
+                                    f"- 2025-08-04 (August 4th, 2025)\n"
+                                    f"- 2025-12-15 (December 15th, 2025)\n\n"
+                                    f"You entered: '{emp_date_input}'")
+                    return
+
+                if not bfm_var.get():
+                    messagebox.showerror("Error", "Please select equipment")
+                    return
+
+                if not description_text.get('1.0', 'end-1c').strip():
+                    messagebox.showerror("Error", "Please enter a description")
+                    return
+
+                if not missing_parts_text.get('1.0', 'end-1c').strip():
+                    messagebox.showerror("Error", "Please enter missing parts details")
+                    return
+
+                # Save to database
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    INSERT INTO equipment_missing_parts
+                    (emp_number, bfm_equipment_no, description, priority, assigned_technician,
+                     reported_date, missing_parts_description, notes, reported_by, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ''', (
+                    emp_number_var.get(),
+                    bfm_var.get(),
+                    description_text.get('1.0', 'end-1c'),
+                    priority_var.get(),
+                    assigned_var.get(),
+                    validated_date,
+                    missing_parts_text.get('1.0', 'end-1c'),
+                    notes_text.get('1.0', 'end-1c'),
+                    self.user_name,
+                    'Open'
+                ))
+                self.conn.commit()
+
+                messagebox.showinfo("Success",
+                                f"Equipment Missing Parts entry created successfully!\n\n"
+                                f"EMP Number: {emp_number_var.get()}\n"
+                                f"Date: {validated_date}\n"
+                                f"Equipment: {bfm_var.get()}\n"
+                                f"Assigned to: {assigned_var.get()}")
+                dialog.destroy()
+                self.load_missing_parts_list()
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to create missing parts entry: {str(e)}")
+
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.grid(row=row, column=0, columnspan=3, pady=20)
+
+        ttk.Button(button_frame, text="Create Entry", command=validate_and_save_emp).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side='left', padx=5)
+
+
+    def edit_missing_parts_dialog(self):
+        """Edit existing Equipment Missing Parts entry"""
+        selected = self.emp_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select an equipment missing parts entry to edit")
+            return
+
+        # Get selected EMP data
+        item = self.emp_tree.item(selected[0])
+        emp_number = item['values'][0]
+
+        # Fetch full EMP data from database
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT emp_number, bfm_equipment_no, description, priority, assigned_technician,
+                status, reported_date, missing_parts_description, notes, reported_by,
+                closed_date, closed_by
+            FROM equipment_missing_parts
+            WHERE emp_number = %s
+        ''', (emp_number,))
+
+        emp_data = cursor.fetchone()
+        if not emp_data:
+            messagebox.showerror("Error", "Equipment missing parts entry not found in database")
+            return
+
+        # Extract data
+        (orig_emp_number, orig_bfm_no, orig_description, orig_priority, orig_assigned,
+        orig_status, orig_reported_date, orig_missing_parts, orig_notes, orig_reported_by,
+        orig_closed_date, orig_closed_by) = emp_data
+
+        # Create edit dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"Edit Equipment Missing Parts - {emp_number}")
+        dialog.geometry("700x800")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Main container with scrollbar
+        main_canvas = tk.Canvas(dialog)
+        scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=main_canvas.yview)
+        scrollable_frame = ttk.Frame(main_canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+        )
+
+        main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        main_canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Header information
+        header_frame = ttk.LabelFrame(scrollable_frame, text="Entry Information", padding=10)
+        header_frame.pack(fill='x', padx=10, pady=5)
+
+        row = 0
+
+        # EMP Number (read-only)
+        ttk.Label(header_frame, text="EMP Number:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        ttk.Label(header_frame, text=orig_emp_number, font=('Arial', 10, 'bold')).grid(row=row, column=1, sticky='w', padx=5, pady=5)
+        row += 1
+
+        # Reported By (read-only)
+        ttk.Label(header_frame, text="Reported By:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        ttk.Label(header_frame, text=orig_reported_by or 'N/A').grid(row=row, column=1, sticky='w', padx=5, pady=5)
+        row += 1
+
+        # Reported Date (read-only)
+        ttk.Label(header_frame, text="Reported Date:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        ttk.Label(header_frame, text=orig_reported_date or 'N/A').grid(row=row, column=1, sticky='w', padx=5, pady=5)
+        row += 1
+
+        # Equipment (editable)
+        ttk.Label(header_frame, text="BFM Equipment No:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        bfm_var = tk.StringVar(value=orig_bfm_no or '')
+        cursor.execute('SELECT DISTINCT bfm_equipment_no FROM equipment ORDER BY bfm_equipment_no')
+        equipment_list = [row_data[0] for row_data in cursor.fetchall()]
+        bfm_combo = ttk.Combobox(header_frame, textvariable=bfm_var, values=equipment_list, width=25)
+        bfm_combo.grid(row=row, column=1, sticky='w', padx=5, pady=5)
+        row += 1
+
+        # Priority (editable)
+        ttk.Label(header_frame, text="Priority:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        priority_var = tk.StringVar(value=orig_priority or 'Medium')
+        priority_combo = ttk.Combobox(header_frame, textvariable=priority_var,
+                                values=['Low', 'Medium', 'High', 'Critical'], width=15)
+        priority_combo.grid(row=row, column=1, sticky='w', padx=5, pady=5)
+        row += 1
+
+        # Assigned Technician (editable)
+        ttk.Label(header_frame, text="Assigned Technician:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        assigned_var = tk.StringVar(value=orig_assigned or '')
+        assigned_combo = ttk.Combobox(header_frame, textvariable=assigned_var,
+                                values=self.technicians, width=20)
+        assigned_combo.grid(row=row, column=1, sticky='w', padx=5, pady=5)
+        row += 1
+
+        # Status (editable)
+        ttk.Label(header_frame, text="Status:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        status_var = tk.StringVar(value=orig_status or 'Open')
+        status_combo = ttk.Combobox(header_frame, textvariable=status_var,
+                              values=['Open', 'Closed'], width=15)
+        status_combo.grid(row=row, column=1, sticky='w', padx=5, pady=5)
+        row += 1
+
+        # Description (editable)
+        desc_frame = ttk.LabelFrame(scrollable_frame, text="Description", padding=10)
+        desc_frame.pack(fill='x', padx=10, pady=5)
+
+        description_text = tk.Text(desc_frame, width=60, height=4)
+        description_text.pack(fill='x', padx=5, pady=5)
+        description_text.insert('1.0', orig_description or '')
+
+        # Missing Parts (editable)
+        parts_frame = ttk.LabelFrame(scrollable_frame, text="Missing Parts", padding=10)
+        parts_frame.pack(fill='x', padx=10, pady=5)
+
+        missing_parts_text = tk.Text(parts_frame, width=60, height=6)
+        missing_parts_text.pack(fill='x', padx=5, pady=5)
+        missing_parts_text.insert('1.0', orig_missing_parts or '')
+
+        # Notes (editable)
+        notes_frame = ttk.LabelFrame(scrollable_frame, text="Additional Notes", padding=10)
+        notes_frame.pack(fill='x', padx=10, pady=5)
+
+        notes_text = tk.Text(notes_frame, width=60, height=4)
+        notes_text.pack(fill='x', padx=5, pady=5)
+        notes_text.insert('1.0', orig_notes or '')
+
+        # Closure information (if closed)
+        if orig_status == 'Closed':
+            closure_frame = ttk.LabelFrame(scrollable_frame, text="Closure Information", padding=10)
+            closure_frame.pack(fill='x', padx=10, pady=5)
+
+            closure_row = 0
+            ttk.Label(closure_frame, text="Closed Date:").grid(row=closure_row, column=0, sticky='w', padx=5, pady=5)
+            ttk.Label(closure_frame, text=orig_closed_date or 'N/A').grid(row=closure_row, column=1, sticky='w', padx=5, pady=5)
+            closure_row += 1
+
+            ttk.Label(closure_frame, text="Closed By:").grid(row=closure_row, column=0, sticky='w', padx=5, pady=5)
+            ttk.Label(closure_frame, text=orig_closed_by or 'N/A').grid(row=closure_row, column=1, sticky='w', padx=5, pady=5)
+
+        def save_changes():
+            """Save the edited entry"""
+            try:
+                if not bfm_var.get():
+                    messagebox.showerror("Error", "Please select equipment")
+                    return
+
+                if not description_text.get('1.0', 'end-1c').strip():
+                    messagebox.showerror("Error", "Please enter a description")
+                    return
+
+                if not missing_parts_text.get('1.0', 'end-1c').strip():
+                    messagebox.showerror("Error", "Please enter missing parts details")
+                    return
+
+                # Update database
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    UPDATE equipment_missing_parts
+                    SET bfm_equipment_no = %s,
+                        description = %s,
+                        priority = %s,
+                        assigned_technician = %s,
+                        status = %s,
+                        missing_parts_description = %s,
+                        notes = %s,
+                        updated_date = CURRENT_TIMESTAMP
+                    WHERE emp_number = %s
+                ''', (
+                    bfm_var.get(),
+                    description_text.get('1.0', 'end-1c'),
+                    priority_var.get(),
+                    assigned_var.get(),
+                    status_var.get(),
+                    missing_parts_text.get('1.0', 'end-1c'),
+                    notes_text.get('1.0', 'end-1c'),
+                    orig_emp_number
+                ))
+                self.conn.commit()
+
+                messagebox.showinfo("Success", f"Equipment Missing Parts entry {orig_emp_number} updated successfully!")
+                dialog.destroy()
+                self.load_missing_parts_list()
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update entry: {str(e)}")
+
+        def delete_entry():
+            """Delete this entry with confirmation"""
+            result = messagebox.askyesno("Confirm Delete",
+                                        f"Are you sure you want to delete entry {orig_emp_number}?\n\n"
+                                        f"This action cannot be undone.")
+            if result:
+                try:
+                    cursor = self.conn.cursor()
+                    cursor.execute('DELETE FROM equipment_missing_parts WHERE emp_number = %s', (orig_emp_number,))
+                    self.conn.commit()
+
+                    messagebox.showinfo("Success", f"Entry {orig_emp_number} deleted successfully!")
+                    dialog.destroy()
+                    self.load_missing_parts_list()
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to delete entry: {str(e)}")
+
+        # Buttons
+        button_frame = ttk.Frame(scrollable_frame)
+        button_frame.pack(fill='x', padx=10, pady=10)
+
+        ttk.Button(button_frame, text="Save Changes", command=save_changes).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Delete Entry", command=delete_entry).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side='left', padx=5)
+
+        # Pack canvas and scrollbar
+        main_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+
+    def close_missing_parts_dialog(self):
+        """Close an Equipment Missing Parts entry"""
+        selected = self.emp_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select an equipment missing parts entry to close")
+            return
+
+        # Get selected EMP data
+        item = self.emp_tree.item(selected[0])
+        emp_number = item['values'][0]
+
+        # Fetch current data
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT emp_number, bfm_equipment_no, description, status, missing_parts_description
+            FROM equipment_missing_parts
+            WHERE emp_number = %s
+        ''', (emp_number,))
+
+        emp_data = cursor.fetchone()
+        if not emp_data:
+            messagebox.showerror("Error", "Equipment missing parts entry not found")
+            return
+
+        orig_emp_number, orig_bfm_no, orig_description, orig_status, orig_missing_parts = emp_data
+
+        if orig_status == 'Closed':
+            messagebox.showinfo("Already Closed", f"Entry {emp_number} is already closed.")
+            return
+
+        # Create close dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"Close Equipment Missing Parts - {emp_number}")
+        dialog.geometry("600x450")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Display current information
+        info_frame = ttk.LabelFrame(dialog, text="Entry Information", padding=10)
+        info_frame.pack(fill='x', padx=10, pady=5)
+
+        ttk.Label(info_frame, text="EMP Number:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        ttk.Label(info_frame, text=emp_number, font=('Arial', 10, 'bold')).grid(row=0, column=1, sticky='w', padx=5, pady=5)
+
+        ttk.Label(info_frame, text="Equipment:").grid(row=1, column=0, sticky='w', padx=5, pady=5)
+        ttk.Label(info_frame, text=orig_bfm_no or 'N/A').grid(row=1, column=1, sticky='w', padx=5, pady=5)
+
+        ttk.Label(info_frame, text="Description:").grid(row=2, column=0, sticky='nw', padx=5, pady=5)
+        desc_label = ttk.Label(info_frame, text=orig_description or 'N/A', wraplength=400)
+        desc_label.grid(row=2, column=1, sticky='w', padx=5, pady=5)
+
+        ttk.Label(info_frame, text="Missing Parts:").grid(row=3, column=0, sticky='nw', padx=5, pady=5)
+        parts_label = ttk.Label(info_frame, text=orig_missing_parts or 'N/A', wraplength=400)
+        parts_label.grid(row=3, column=1, sticky='w', padx=5, pady=5)
+
+        # Closure information
+        closure_frame = ttk.LabelFrame(dialog, text="Closure Information", padding=10)
+        closure_frame.pack(fill='x', padx=10, pady=5)
+
+        # Closure Date
+        ttk.Label(closure_frame, text="Closure Date:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        closure_date_var = tk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
+        ttk.Entry(closure_frame, textvariable=closure_date_var, width=15).grid(row=0, column=1, sticky='w', padx=5, pady=5)
+        ttk.Label(closure_frame, text="Format: YYYY-MM-DD", font=('Arial', 8), foreground='gray').grid(row=0, column=2, sticky='w', padx=5)
+
+        # Closure Notes
+        ttk.Label(closure_frame, text="Closure Notes:").grid(row=1, column=0, sticky='nw', padx=5, pady=5)
+        ttk.Label(closure_frame, text="(Parts procured, issue resolved, etc.)", font=('Arial', 8), foreground='gray').grid(row=1, column=1, sticky='w', padx=5, pady=0)
+        closure_notes_text = tk.Text(closure_frame, width=40, height=6)
+        closure_notes_text.grid(row=2, column=1, columnspan=2, sticky='w', padx=5, pady=5)
+
+        def save_closure():
+            """Save the closure"""
+            try:
+                closure_date_input = closure_date_var.get().strip()
+
+                if not closure_date_input:
+                    messagebox.showerror("Error", "Please enter a closure date")
+                    return
+
+                try:
+                    parsed_date = datetime.strptime(closure_date_input, '%Y-%m-%d')
+                    validated_date = parsed_date.strftime('%Y-%m-%d')
+                except ValueError:
+                    messagebox.showerror("Invalid Date Format",
+                                    f"Please enter the date in YYYY-MM-DD format.\n\n"
+                                    f"You entered: '{closure_date_input}'")
+                    return
+
+                closure_notes = closure_notes_text.get('1.0', 'end-1c').strip()
+
+                # Update database
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    UPDATE equipment_missing_parts
+                    SET status = 'Closed',
+                        closed_date = %s,
+                        closed_by = %s,
+                        notes = COALESCE(notes, '') || %s,
+                        updated_date = CURRENT_TIMESTAMP
+                    WHERE emp_number = %s
+                ''', (
+                    validated_date,
+                    self.user_name,
+                    '\n\n[CLOSURE NOTES]\n' + closure_notes if closure_notes else '',
+                    emp_number
+                ))
+                self.conn.commit()
+
+                messagebox.showinfo("Success",
+                                f"Entry {emp_number} closed successfully!\n\n"
+                                f"Closed Date: {validated_date}\n"
+                                f"Closed By: {self.user_name}")
+                dialog.destroy()
+                self.load_missing_parts_list()
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to close entry: {str(e)}")
+
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill='x', padx=10, pady=20)
+
+        ttk.Button(button_frame, text="Close Entry", command=save_closure).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side='left', padx=5)
+
+
     def edit_cm_dialog(self):
         """Edit existing Corrective Maintenance with full functionality"""
         selected = self.cm_tree.selection()
