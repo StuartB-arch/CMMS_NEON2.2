@@ -11283,9 +11283,6 @@ class AITCMMSSystem:
     def load_missing_parts_list(self):
         """Load equipment missing parts data with status feedback"""
         try:
-            # Ensure connection is valid
-            self.validate_and_refresh_connection()
-
             cursor = self.conn.cursor()
 
             # Count total records first
@@ -13398,9 +13395,6 @@ class AITCMMSSystem:
 
         # Generate next EMP number in format EMP-YYYYMMDD-XXXX
         try:
-            # Ensure connection is valid
-            self.validate_and_refresh_connection()
-
             cursor = self.conn.cursor()
             today = datetime.now().strftime('%Y%m%d')
 
@@ -13587,9 +13581,6 @@ class AITCMMSSystem:
 
                 # Save to database
                 print(f"DEBUG: Attempting to save missing parts entry {emp_number_var.get()}")
-
-                # Ensure connection is valid
-                self.validate_and_refresh_connection()
 
                 cursor = self.conn.cursor()
                 cursor.execute('''
