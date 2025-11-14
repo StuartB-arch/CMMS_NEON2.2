@@ -10683,24 +10683,24 @@ class AITCMMSSystem:
                     else:
                         value = entry_widget.get()
                     updated_data.append(value)
-            
+
                 # Validate required fields
                 if not updated_data[0].strip():  # BFM number is required
                     messagebox.showerror("Validation Error", "BFM Equipment No. is required.")
                     return
-            
-                # TODO: Update database here
-                # Example: self.update_asset_in_database(updated_data)
-            
-                # Update treeview
-                self.cannot_find_tree.item(tree_item, values=updated_data)
-            
+
+                # Update database
+                self.update_asset_in_database(updated_data)
+
+                # Reload the cannot find assets list to show updated data from database
+                self.load_cannot_find_assets()
+
                 # Show success message
-                messagebox.showinfo("Success", "Asset information updated successfully.")
-                
+                messagebox.showinfo("Success", "Asset information updated successfully in database.")
+
                 # Close edit window
                 edit_window.destroy()
-            
+
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to update asset: {str(e)}")
     
@@ -10725,18 +10725,18 @@ class AITCMMSSystem:
 
     def update_asset_in_database(self, asset_data):
         """Update asset record in database"""
-        # Example using SQLite
         try:
-            cursor = self.connection.cursor()
+            cursor = self.conn.cursor()
             cursor.execute("""
-                UPDATE cannot_find_assets 
-                SET description = %s, location = %s, technician = %s, 
-                    reported_date = %s, status = %s
-                WHERE bfm_number = %s
-            """, (asset_data[1], asset_data[2], asset_data[3], 
+                UPDATE cannot_find_assets
+                SET description = %s, location = %s, technician_name = %s,
+                    reported_date = %s, status = %s, updated_date = CURRENT_TIMESTAMP
+                WHERE bfm_equipment_no = %s
+            """, (asset_data[1], asset_data[2], asset_data[3],
                 asset_data[4], asset_data[5], asset_data[0]))
-            self.connection.commit()
+            self.conn.commit()
         except Exception as e:
+            self.conn.rollback()
             raise Exception(f"Database error: {str(e)}")
 
 
