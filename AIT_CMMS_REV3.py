@@ -10855,12 +10855,12 @@ class AITCMMSSystem:
 
         # CM list with enhanced columns for SharePoint data
         cm_list_frame = ttk.LabelFrame(self.cm_frame, text="Corrective Maintenance List", padding=10)
-        cm_list_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        cm_list_frame.pack(fill='both', expand=False, padx=10, pady=5)
 
         # Enhanced treeview with additional columns (fixed height to ensure missing parts list is visible)
         self.cm_tree = ttk.Treeview(cm_list_frame,
                                 columns=('CM Number', 'BFM', 'Description', 'Priority', 'Assigned', 'Status', 'Created', 'Source'),
-                                show='headings', height=10)
+                                show='headings', height=8)
 
         cm_columns = {
             'CM Number': 120,
@@ -10896,25 +10896,35 @@ class AITCMMSSystem:
         # Load CM data
         self.load_corrective_maintenance_with_filter()
 
-        # Equipment Missing Parts list section
-        emp_list_frame = ttk.LabelFrame(self.cm_frame, text="Equipment with Missing Parts", padding=10)
+        # Add a separator for visual clarity
+        separator = ttk.Separator(self.cm_frame, orient='horizontal')
+        separator.pack(fill='x', padx=10, pady=10)
+
+        # Equipment Missing Parts list section - SEPARATE AND PROMINENT
+        emp_list_frame = ttk.LabelFrame(self.cm_frame, text="⚠️ EQUIPMENT WITH MISSING PARTS - SEPARATE LIST ⚠️", padding=10)
         emp_list_frame.pack(fill='both', expand=True, padx=10, pady=5)
 
         # Refresh button for missing parts
         emp_controls_frame = ttk.Frame(emp_list_frame)
         emp_controls_frame.pack(fill='x', pady=(0, 5))
 
-        ttk.Button(emp_controls_frame, text="Refresh Missing Parts List",
+        ttk.Button(emp_controls_frame, text="🔄 Refresh Missing Parts List",
                 command=self.load_missing_parts_list).pack(side='left', padx=5)
+
+        # Add info label
+        info_label = ttk.Label(emp_controls_frame,
+                              text="This is a SEPARATE list from CM items above - entries you create will appear here",
+                              foreground='blue', font=('Arial', 9, 'italic'))
+        info_label.pack(side='left', padx=10)
 
         # Create a container frame for the treeview and scrollbars (using grid)
         emp_tree_container = ttk.Frame(emp_list_frame)
         emp_tree_container.pack(fill='both', expand=True)
 
-        # Treeview for missing parts entries
+        # Treeview for missing parts entries - Increased height for better visibility
         self.emp_tree = ttk.Treeview(emp_tree_container,
                                 columns=('EMP Number', 'BFM', 'Description', 'Priority', 'Assigned', 'Status', 'Reported Date', 'Missing Parts'),
-                                show='headings', height=8)
+                                show='headings', height=10)
 
         emp_columns = {
             'EMP Number': 120,
@@ -11271,9 +11281,18 @@ class AITCMMSSystem:
 
 
     def load_missing_parts_list(self):
-        """Load equipment missing parts data"""
+        """Load equipment missing parts data with status feedback"""
         try:
+            # Ensure connection is valid
+            self.validate_and_refresh_connection()
+
             cursor = self.conn.cursor()
+
+            # Count total records first
+            cursor.execute('SELECT COUNT(*) FROM equipment_missing_parts')
+            total_count = cursor.fetchone()[0]
+
+            # Fetch all missing parts records
             cursor.execute('''
                 SELECT emp_number, bfm_equipment_no, description, priority,
                     assigned_technician, status, reported_date, missing_parts_description
@@ -11286,7 +11305,8 @@ class AITCMMSSystem:
                 self.emp_tree.delete(item)
 
             # Add missing parts records
-            for idx, emp in enumerate(cursor.fetchall()):
+            records = cursor.fetchall()
+            for idx, emp in enumerate(records):
                 emp_number, bfm_no, description, priority, assigned, status, reported_date, missing_parts = emp
 
                 # Truncate description and missing parts for display
@@ -11300,6 +11320,16 @@ class AITCMMSSystem:
                 # Yield to event loop every 50 items to keep UI responsive
                 if idx % 50 == 0:
                     self.root.update_idletasks()
+
+            # Update status bar with count
+            if hasattr(self, 'update_status'):
+                if total_count > 0:
+                    self.update_status(f"✅ Loaded {total_count} equipment missing parts entries")
+                else:
+                    self.update_status("ℹ️ No missing parts entries found - Create one using 'Report Missing Parts' button")
+
+            print(f"DEBUG: Successfully loaded {total_count} missing parts entries")
+            cursor.close()
 
         except Exception as e:
             print(f"Error loading equipment missing parts: {e}")
@@ -13367,17 +13397,32 @@ class AITCMMSSystem:
         dialog.grab_set()
 
         # Generate next EMP number in format EMP-YYYYMMDD-XXXX
-        cursor = self.conn.cursor()
-        today = datetime.now().strftime('%Y%m%d')
-        cursor.execute(
-            "SELECT MAX(CAST(SPLIT_PART(emp_number, '-', 3) AS INTEGER)) "
-            "FROM equipment_missing_parts "
-            "WHERE emp_number LIKE %s",
-            (f'EMP-{today}-%',)
-        )
-        result = cursor.fetchone()[0]
-        next_seq = (result + 1) if result else 1
-        next_emp_num = f"EMP-{today}-{next_seq:04d}"
+        try:
+            # Ensure connection is valid
+            self.validate_and_refresh_connection()
+
+            cursor = self.conn.cursor()
+            today = datetime.now().strftime('%Y%m%d')
+
+            # Get the maximum sequence number for today
+            cursor.execute(
+                "SELECT MAX(CAST(SPLIT_PART(emp_number, '-', 3) AS INTEGER)) "
+                "FROM equipment_missing_parts "
+                "WHERE emp_number LIKE %s",
+                (f'EMP-{today}-%',)
+            )
+            result = cursor.fetchone()[0]
+            next_seq = (result + 1) if result else 1
+            next_emp_num = f"EMP-{today}-{next_seq:04d}"
+
+            print(f"DEBUG: Generated EMP number: {next_emp_num}")
+            cursor.close()
+
+        except Exception as e:
+            print(f"Error generating EMP number: {e}")
+            # Fallback to simple sequence
+            next_emp_num = f"EMP-{datetime.now().strftime('%Y%m%d')}-0001"
+            messagebox.showwarning("Warning", f"Could not generate sequence number, using default: {next_emp_num}")
 
         row = 0
 
@@ -13541,6 +13586,11 @@ class AITCMMSSystem:
                     return
 
                 # Save to database
+                print(f"DEBUG: Attempting to save missing parts entry {emp_number_var.get()}")
+
+                # Ensure connection is valid
+                self.validate_and_refresh_connection()
+
                 cursor = self.conn.cursor()
                 cursor.execute('''
                     INSERT INTO equipment_missing_parts
@@ -13560,15 +13610,26 @@ class AITCMMSSystem:
                     'Open'
                 ))
                 self.conn.commit()
+                cursor.close()
+
+                print(f"DEBUG: Successfully saved missing parts entry {emp_number_var.get()}")
 
                 messagebox.showinfo("Success",
-                                f"Equipment Missing Parts entry created successfully!\n\n"
+                                f"✅ Equipment Missing Parts entry created successfully!\n\n"
                                 f"EMP Number: {emp_number_var.get()}\n"
                                 f"Date: {validated_date}\n"
                                 f"Equipment: {bfm_var.get()}\n"
-                                f"Assigned to: {assigned_var.get()}")
+                                f"Assigned to: {assigned_var.get()}\n\n"
+                                f"⚠️ Check the 'Equipment with Missing Parts' section below the CM list!")
                 dialog.destroy()
+
+                # Refresh the missing parts list to show the new entry
+                print("DEBUG: Refreshing missing parts list...")
                 self.load_missing_parts_list()
+
+                # Update status bar
+                if hasattr(self, 'update_status'):
+                    self.update_status(f"✅ Created missing parts entry: {emp_number_var.get()}")
 
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to create missing parts entry: {str(e)}")
