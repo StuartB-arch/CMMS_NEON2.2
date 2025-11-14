@@ -8586,10 +8586,19 @@ class AITCMMSSystem:
                     closed_date TEXT,
                     closed_by TEXT,
                     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (bfm_equipment_no) REFERENCES equipment (bfm_equipment_no)
+                    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+
+            # Drop foreign key constraint if it exists (for existing databases)
+            try:
+                cursor.execute('''
+                    ALTER TABLE equipment_missing_parts
+                    DROP CONSTRAINT IF EXISTS equipment_missing_parts_bfm_equipment_no_fkey
+                ''')
+                print("INFO: Removed foreign key constraint from equipment_missing_parts table")
+            except Exception as e:
+                print(f"Note: Foreign key constraint removal skipped: {e}")
 
             # Create indexes for equipment_missing_parts table for better performance
             cursor.execute('''
