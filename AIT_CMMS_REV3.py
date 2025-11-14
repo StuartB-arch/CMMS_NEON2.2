@@ -10857,10 +10857,10 @@ class AITCMMSSystem:
         cm_list_frame = ttk.LabelFrame(self.cm_frame, text="Corrective Maintenance List", padding=10)
         cm_list_frame.pack(fill='both', expand=True, padx=10, pady=5)
 
-        # Enhanced treeview with additional columns
+        # Enhanced treeview with additional columns (fixed height to ensure missing parts list is visible)
         self.cm_tree = ttk.Treeview(cm_list_frame,
                                 columns=('CM Number', 'BFM', 'Description', 'Priority', 'Assigned', 'Status', 'Created', 'Source'),
-                                show='headings')
+                                show='headings', height=10)
 
         cm_columns = {
             'CM Number': 120,
@@ -10900,10 +10900,17 @@ class AITCMMSSystem:
         emp_list_frame = ttk.LabelFrame(self.cm_frame, text="Equipment with Missing Parts", padding=10)
         emp_list_frame.pack(fill='both', expand=True, padx=10, pady=5)
 
+        # Refresh button for missing parts
+        emp_controls_frame = ttk.Frame(emp_list_frame)
+        emp_controls_frame.pack(fill='x', pady=(0, 5))
+
+        ttk.Button(emp_controls_frame, text="Refresh Missing Parts List",
+                command=self.load_missing_parts_list).pack(side='left', padx=5)
+
         # Treeview for missing parts entries
         self.emp_tree = ttk.Treeview(emp_list_frame,
                                 columns=('EMP Number', 'BFM', 'Description', 'Priority', 'Assigned', 'Status', 'Reported Date', 'Missing Parts'),
-                                show='headings')
+                                show='headings', height=8)
 
         emp_columns = {
             'EMP Number': 120,
