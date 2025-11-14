@@ -10907,8 +10907,12 @@ class AITCMMSSystem:
         ttk.Button(emp_controls_frame, text="Refresh Missing Parts List",
                 command=self.load_missing_parts_list).pack(side='left', padx=5)
 
+        # Create a container frame for the treeview and scrollbars (using grid)
+        emp_tree_container = ttk.Frame(emp_list_frame)
+        emp_tree_container.pack(fill='both', expand=True)
+
         # Treeview for missing parts entries
-        self.emp_tree = ttk.Treeview(emp_list_frame,
+        self.emp_tree = ttk.Treeview(emp_tree_container,
                                 columns=('EMP Number', 'BFM', 'Description', 'Priority', 'Assigned', 'Status', 'Reported Date', 'Missing Parts'),
                                 show='headings', height=8)
 
@@ -10928,17 +10932,17 @@ class AITCMMSSystem:
             self.emp_tree.column(col, width=width)
 
         # Scrollbars for missing parts list
-        emp_v_scrollbar = ttk.Scrollbar(emp_list_frame, orient='vertical', command=self.emp_tree.yview)
-        emp_h_scrollbar = ttk.Scrollbar(emp_list_frame, orient='horizontal', command=self.emp_tree.xview)
+        emp_v_scrollbar = ttk.Scrollbar(emp_tree_container, orient='vertical', command=self.emp_tree.yview)
+        emp_h_scrollbar = ttk.Scrollbar(emp_tree_container, orient='horizontal', command=self.emp_tree.xview)
         self.emp_tree.configure(yscrollcommand=emp_v_scrollbar.set, xscrollcommand=emp_h_scrollbar.set)
 
-        # Pack treeview and scrollbars
+        # Grid treeview and scrollbars inside the container
         self.emp_tree.grid(row=0, column=0, sticky='nsew')
         emp_v_scrollbar.grid(row=0, column=1, sticky='ns')
         emp_h_scrollbar.grid(row=1, column=0, sticky='ew')
 
-        emp_list_frame.grid_rowconfigure(0, weight=1)
-        emp_list_frame.grid_columnconfigure(0, weight=1)
+        emp_tree_container.grid_rowconfigure(0, weight=1)
+        emp_tree_container.grid_columnconfigure(0, weight=1)
 
         # Load Equipment Missing Parts data
         self.load_missing_parts_list()
