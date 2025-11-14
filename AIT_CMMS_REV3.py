@@ -11273,11 +11273,6 @@ class AITCMMSSystem:
     def load_missing_parts_list(self):
         """Load equipment missing parts data"""
         try:
-            # Check if emp_tree exists
-            if not hasattr(self, 'emp_tree'):
-                print("WARNING: emp_tree not initialized yet")
-                return
-
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT emp_number, bfm_equipment_no, description, priority,
@@ -11286,15 +11281,12 @@ class AITCMMSSystem:
                 ORDER BY reported_date DESC
             ''')
 
-            results = cursor.fetchall()
-            print(f"DEBUG: Found {len(results)} equipment missing parts entries")
-
             # Clear existing items
             for item in self.emp_tree.get_children():
                 self.emp_tree.delete(item)
 
             # Add missing parts records
-            for idx, emp in enumerate(results):
+            for idx, emp in enumerate(cursor.fetchall()):
                 emp_number, bfm_no, description, priority, assigned, status, reported_date, missing_parts = emp
 
                 # Truncate description and missing parts for display
@@ -11309,12 +11301,8 @@ class AITCMMSSystem:
                 if idx % 50 == 0:
                     self.root.update_idletasks()
 
-            print(f"DEBUG: Loaded {len(results)} entries into emp_tree")
-
         except Exception as e:
             print(f"Error loading equipment missing parts: {e}")
-            import traceback
-            traceback.print_exc()
             messagebox.showerror("Error", f"Failed to load equipment missing parts: {e}")
 
 
@@ -13554,16 +13542,13 @@ class AITCMMSSystem:
 
                 # Save to database
                 cursor = self.conn.cursor()
-                emp_num = emp_number_var.get()
-                print(f"DEBUG: Inserting missing parts entry {emp_num}")
-
                 cursor.execute('''
                     INSERT INTO equipment_missing_parts
                     (emp_number, bfm_equipment_no, description, priority, assigned_technician,
                      reported_date, missing_parts_description, notes, reported_by, status)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ''', (
-                    emp_num,
+                    emp_number_var.get(),
                     bfm_var.get(),
                     description_text.get('1.0', 'end-1c'),
                     priority_var.get(),
@@ -13575,17 +13560,15 @@ class AITCMMSSystem:
                     'Open'
                 ))
                 self.conn.commit()
-                print(f"DEBUG: Successfully inserted {emp_num}, now refreshing list...")
 
                 messagebox.showinfo("Success",
                                 f"Equipment Missing Parts entry created successfully!\n\n"
-                                f"EMP Number: {emp_num}\n"
+                                f"EMP Number: {emp_number_var.get()}\n"
                                 f"Date: {validated_date}\n"
                                 f"Equipment: {bfm_var.get()}\n"
                                 f"Assigned to: {assigned_var.get()}")
                 dialog.destroy()
                 self.load_missing_parts_list()
-                print(f"DEBUG: Refresh complete")
 
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to create missing parts entry: {str(e)}")
