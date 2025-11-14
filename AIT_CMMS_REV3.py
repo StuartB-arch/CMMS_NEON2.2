@@ -12297,28 +12297,36 @@ class AITCMMSSystem:
             story.append(Spacer(1, 20))
         
             if assets:
-                # Create table
+                # Create table with proper column widths
                 data = [['BFM Equipment No.', 'Description', 'Location', 'Reported By', 'Report Date']]
+
+                # Create a style for wrapping text in cells
+                cell_style = ParagraphStyle('CellStyle', parent=styles['Normal'], fontSize=9, leading=11)
+
                 for asset in assets:
                     bfm_no, description, location, technician, reported_date, notes = asset
                     data.append([
-                        bfm_no,
-                        (description[:30] + '...') if description and len(description) > 30 else (description or ''),
-                        location or '',
-                        technician,
-                        reported_date
+                        Paragraph(str(bfm_no or ''), cell_style),
+                        Paragraph(str(description or ''), cell_style),
+                        Paragraph(str(location or ''), cell_style),
+                        Paragraph(str(technician or ''), cell_style),
+                        Paragraph(str(reported_date or ''), cell_style)
                     ])
-                
-                table = Table(data, colWidths=[1.5*inch, 2.5*inch, 1.2*inch, 1.2*inch, 1*inch])
+
+                # Adjusted column widths: wider for description and more balanced overall
+                table = Table(data, colWidths=[1.3*inch, 3*inch, 1.3*inch, 1.3*inch, 1.1*inch])
                 table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, 0), 10),
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                     ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('TOPPADDING', (0, 1), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 6)
                 ]))
             
                 story.append(table)
