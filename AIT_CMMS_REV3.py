@@ -34,6 +34,7 @@ from typing import List, Dict, Optional, Tuple, NamedTuple
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+import sys
 try:
     from reportlab.lib.pagesizes import letter
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
@@ -44,6 +45,41 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
     print("ReportLab not installed. PDF generation will not work.")
+
+def get_scaling_factor():
+    """
+    Get appropriate UI scaling factor based on screen resolution.
+    For high-DPI displays (like 4K), we need to scale up the UI elements.
+    """
+    try:
+        import tkinter as tk
+        # Create temporary root to get screen dimensions
+        temp_root = tk.Tk()
+        temp_root.withdraw()  # Hide the window
+
+        screen_width = temp_root.winfo_screenwidth()
+        screen_height = temp_root.winfo_screenheight()
+
+        temp_root.destroy()
+
+        # Calculate scaling based on screen resolution
+        # Standard 1920x1080 = no scaling (1.0)
+        # 4K 3840x2160 = 2x scaling (2.0)
+        if screen_width >= 3840 or screen_height >= 2160:
+            # 4K or higher - use 2x scaling
+            scaling = 2.0
+        elif screen_width >= 2560 or screen_height >= 1440:
+            # 1440p - use 1.5x scaling
+            scaling = 1.5
+        else:
+            # 1080p or lower - no scaling
+            scaling = 1.0
+
+        print(f"Screen resolution: {screen_width}x{screen_height}, Scaling: {scaling}")
+        return scaling
+    except Exception as e:
+        print(f"Could not detect screen resolution: {e}")
+        return 1.0  # Default to no scaling
 
 class PMType(Enum):
     MONTHLY = "Monthly"
@@ -5998,6 +6034,16 @@ class AITCMMSSystem:
         self.session_id = None  # Track user session for multi-user support
         self.user_id = None  # Database user ID
         self.root.title("AIT Complete CMMS - Computerized Maintenance Management System")
+
+        # Apply UI scaling based on screen resolution
+        # This is critical for 4K displays to make text/buttons readable
+        try:
+            scaling_factor = get_scaling_factor()
+            self.root.tk.call('tk', 'scaling', scaling_factor)
+            print(f"Applied Tkinter scaling: {scaling_factor}")
+        except Exception as e:
+            print(f"Could not apply scaling: {e}")
+
         self.root.geometry("1800x1000")
         try:
             self.root.state('zoomed')  # Maximize window on Windows
