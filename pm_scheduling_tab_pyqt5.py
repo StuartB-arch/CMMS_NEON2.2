@@ -1001,20 +1001,21 @@ class PMSchedulingTab(QWidget):
             traceback.print_exc()
 
     def export_monthly_summary_pdf(self, month: int, year: int):
-        """Generate and export monthly PM summary as PDF"""
+        """Generate comprehensive monthly PM summary as PDF with all data"""
         try:
             from reportlab.lib.pagesizes import letter
             from reportlab.lib import colors
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
             from reportlab.lib.units import inch
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT
             from datetime import datetime, timedelta
             import calendar
 
             # Create filename
             month_name = calendar.month_name[month]
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            default_filename = f"Monthly_PM_Summary_{month_name}_{year}_{timestamp}.pdf"
+            default_filename = f"AIT_Monthly_Report_{month_name}_{year}_{timestamp}.pdf"
 
             # Open file dialog
             filename, _ = QFileDialog.getSaveFileName(
@@ -1030,90 +1031,324 @@ class PMSchedulingTab(QWidget):
             # Create PDF document
             doc = SimpleDocTemplate(filename, pagesize=letter,
                                   rightMargin=36, leftMargin=36,
-                                  topMargin=36, bottomMargin=36)
+                                  topMargin=50, bottomMargin=36)
 
             styles = getSampleStyleSheet()
             story = []
 
-            # Title
+            # ==================== CUSTOM STYLES ====================
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
                 fontSize=24,
-                textColor=colors.HexColor('#1a1a1a'),
+                textColor=colors.HexColor('#1a365d'),
                 spaceAfter=30,
-                alignment=1  # Center
+                alignment=TA_CENTER,
+                fontName='Helvetica-Bold'
             )
-            story.append(Paragraph(f"Monthly PM Summary Report", title_style))
-            story.append(Paragraph(f"{month_name} {year}", styles['Heading2']))
-            story.append(Spacer(1, 0.3*inch))
 
-            # Get monthly data
+            heading_style = ParagraphStyle(
+                'CustomHeading',
+                parent=styles['Heading2'],
+                fontSize=14,
+                textColor=colors.HexColor('#2c5282'),
+                spaceAfter=12,
+                spaceBefore=12,
+                fontName='Helvetica-Bold'
+            )
+
+            body_style = ParagraphStyle(
+                'CustomBody',
+                parent=styles['Normal'],
+                fontSize=10,
+                textColor=colors.HexColor('#2d3748'),
+                spaceAfter=6,
+                fontName='Helvetica'
+            )
+
+            # ==================== TITLE PAGE ====================
+            story.append(Paragraph("AIRBUS AIT", title_style))
+            story.append(Paragraph("Monthly Maintenance Summary Report",
+                                ParagraphStyle('Subtitle', parent=styles['Normal'],
+                                           fontSize=16, alignment=TA_CENTER,
+                                           textColor=colors.HexColor('#4a5568'))))
+            story.append(Spacer(1, 20))
+
+            # Report metadata box
+            meta_data = [
+                ['Report Period:', f'{month_name} {year}'],
+                ['Generated:', datetime.now().strftime('%B %d, %Y at %I:%M %p')],
+                ['Report Type:', 'Comprehensive Monthly Summary']
+            ]
+
+            meta_table = Table(meta_data, colWidths=[2*inch, 4*inch])
+            meta_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e2e8f0')),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2d3748')),
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+
+            story.append(meta_table)
+            story.append(Spacer(1, 30))
+
+            # ==================== EXECUTIVE SUMMARY ====================
+            story.append(Paragraph("EXECUTIVE SUMMARY", heading_style))
+            story.append(Spacer(1, 10))
+
+            # Get PM summary data
             cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
-            # PM completions for the month
             start_date = f"{year}-{month:02d}-01"
             last_day = calendar.monthrange(year, month)[1]
             end_date = f"{year}-{month:02d}-{last_day}"
 
             cursor.execute('''
-                SELECT pm_type, COUNT(*) as count, SUM(labor_hours) as total_hours
+                SELECT
+                    COUNT(*) as total_completions,
+                    SUM(labor_hours + labor_minutes/60.0) as total_hours,
+                    AVG(labor_hours + labor_minutes/60.0) as avg_hours
                 FROM pm_completions
-                WHERE completion_date BETWEEN %s AND %s
-                GROUP BY pm_type
-                ORDER BY pm_type
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
             ''', (start_date, end_date))
 
-            pm_data = cursor.fetchall()
+            pm_result = cursor.fetchone()
+            pm_completions = pm_result['total_completions'] or 0
+            pm_total_hours = pm_result['total_hours'] or 0.0
+            pm_avg_hours = pm_result['avg_hours'] or 0.0
 
-            # Summary section
-            story.append(Paragraph("PM Completions Summary", styles['Heading2']))
-
-            if pm_data:
-                summary_table_data = [['PM Type', 'Count', 'Total Hours']]
-                total_pms = 0
-                total_hours = 0
-
-                for row in pm_data:
-                    pm_type = row['pm_type'] or 'Unknown'
-                    count = row['count'] or 0
-                    hours = row['total_hours'] or 0
-                    total_pms += count
-                    total_hours += hours
-                    summary_table_data.append([pm_type, str(count), f"{hours:.1f}"])
-
-                summary_table_data.append(['TOTAL', str(total_pms), f"{total_hours:.1f}"])
-
-                summary_table = Table(summary_table_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
-                summary_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E8F5E9')),
-                    ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
-                story.append(summary_table)
-            else:
-                story.append(Paragraph("No PM completions recorded for this month.", styles['Normal']))
-
-            story.append(Spacer(1, 0.3*inch))
-
-            # Technician summary
+            # Get CM created this month
             cursor.execute('''
-                SELECT technician_name, COUNT(*) as count, SUM(labor_hours) as total_hours
+                SELECT COUNT(*) as count FROM corrective_maintenance
+                WHERE created_date::date BETWEEN %s::date AND %s::date
+            ''', (start_date, end_date))
+            cms_created = cursor.fetchone()['count'] or 0
+
+            # Get CM closed this month
+            cursor.execute('''
+                SELECT COUNT(*) as count FROM corrective_maintenance
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date))
+            cms_closed = cursor.fetchone()['count'] or 0
+
+            # Summary highlights table
+            summary_data = [
+                ['METRIC', 'VALUE'],
+                ['PM Completions', f'{pm_completions:,}'],
+                ['Total PM Labor Hours', f'{pm_total_hours:.1f} hrs'],
+                ['Average Time per PM', f'{pm_avg_hours:.1f} hrs'],
+                ['CMs Created', f'{cms_created:,}'],
+                ['CMs Closed', f'{cms_closed:,}']
+            ]
+
+            summary_table = Table(summary_data, colWidths=[3.5*inch, 2.5*inch])
+            summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 11),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f7fafc')])
+            ]))
+
+            story.append(summary_table)
+            story.append(Spacer(1, 25))
+
+            # ==================== CORRECTIVE MAINTENANCE DETAIL ====================
+            story.append(Paragraph("CORRECTIVE MAINTENANCE ANALYSIS", heading_style))
+            story.append(Spacer(1, 10))
+
+            # Get CM breakdown data
+            cursor.execute('''
+                SELECT COUNT(*) as count FROM corrective_maintenance
+                WHERE created_date::date BETWEEN %s::date AND %s::date
+                AND completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date, start_date, end_date))
+            cms_created_and_closed = cursor.fetchone()['count'] or 0
+
+            cursor.execute('''
+                SELECT COUNT(*) as count FROM corrective_maintenance
+                WHERE NOT (created_date::date BETWEEN %s::date AND %s::date)
+                AND completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date, start_date, end_date))
+            cms_closed_from_before = cursor.fetchone()['count'] or 0
+
+            cursor.execute("SELECT COUNT(*) as count FROM corrective_maintenance WHERE status = 'Open'")
+            cms_open_current = cursor.fetchone()['count'] or 0
+
+            # Get CM labor hours
+            cursor.execute('''
+                SELECT
+                    SUM(labor_hours) as total_hours,
+                    AVG(labor_hours) as avg_hours
+                FROM corrective_maintenance
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date))
+
+            cm_hours_result = cursor.fetchone()
+            cm_total_hours = cm_hours_result['total_hours'] or 0.0
+            cm_avg_hours = cm_hours_result['avg_hours'] or 0.0
+
+            # Get days to close
+            cursor.execute('''
+                SELECT
+                    SUM(completion_date::date - created_date::date) as total_days_to_close,
+                    AVG(completion_date::date - created_date::date) as avg_days_to_close
+                FROM corrective_maintenance
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date))
+
+            closed_days_result = cursor.fetchone()
+            cms_total_days_to_close = closed_days_result['total_days_to_close'] or 0
+            cms_avg_days_to_close = closed_days_result['avg_days_to_close'] or 0.0
+
+            # CM breakdown table
+            cm_breakdown_data = [
+                ['CATEGORY', 'VALUE'],
+                ['CMs Created This Month', str(cms_created)],
+                ['CMs Closed This Month', str(cms_closed)],
+                ['  - Created & Closed Same Month', str(cms_created_and_closed)],
+                [f'  - Carried Over from Prior Months', str(cms_closed_from_before)]
+            ]
+
+            if cms_closed > 0:
+                cm_breakdown_data.extend([
+                    ['  - Total Days to Close (All Closed CMs)', f'{int(cms_total_days_to_close)} days'],
+                    ['  - Average Days to Close per CM', f'{cms_avg_days_to_close:.1f} days']
+                ])
+
+            cm_breakdown_data.extend([
+                ['CM Total Labor Hours (Closed)', f'{cm_total_hours:.1f} hours'],
+                ['CM Average Hours per Closure', f'{cm_avg_hours:.1f} hours'],
+                ['Currently Open CMs', str(cms_open_current)]
+            ])
+
+            cm_table = Table(cm_breakdown_data, colWidths=[4.5*inch, 1.5*inch])
+            cm_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('BACKGROUND', (0, 1), (-1, 2), colors.white),
+                ('BACKGROUND', (0, 3), (-1, -1), colors.HexColor('#f7fafc')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('LEFTPADDING', (0, 3), (0, 4), 24),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+
+            story.append(cm_table)
+            story.append(Spacer(1, 20))
+
+            # ==================== OVERALL MAINTENANCE EFFICIENCY ====================
+            story.append(Paragraph("OVERALL MAINTENANCE EFFICIENCY", heading_style))
+            story.append(Spacer(1, 10))
+
+            # Efficiency calculation
+            TOTAL_TECHNICIANS = 9
+            ANNUAL_HOURS_PER_TECHNICIAN = 1980
+            MONTHLY_AVAILABLE_HOURS = (TOTAL_TECHNICIANS * ANNUAL_HOURS_PER_TECHNICIAN) / 12
+            WEEKLY_AVAILABLE_HOURS = 342.69
+            TARGET_EFFICIENCY_RATE = 80.0
+
+            # Calculate total maintenance hours
+            total_maintenance_hours = pm_total_hours + cm_total_hours
+            efficiency_rate = (total_maintenance_hours / MONTHLY_AVAILABLE_HOURS) * 100 if MONTHLY_AVAILABLE_HOURS > 0 else 0.0
+
+            # Determine status and color
+            if efficiency_rate >= TARGET_EFFICIENCY_RATE:
+                efficiency_status = "MEETS TARGET ✓"
+                status_color = colors.HexColor('#22c55e')
+            else:
+                efficiency_status = "BELOW TARGET ✗"
+                status_color = colors.HexColor('#ef4444')
+
+            # Build efficiency data table
+            efficiency_data = [
+                ['METRIC', 'VALUE'],
+                ['Total PM Hours', f'{pm_total_hours:.1f} hours'],
+                ['Total CM Hours', f'{cm_total_hours:.1f} hours'],
+                ['Total Maintenance Hours', f'{total_maintenance_hours:.1f} hours'],
+                ['Monthly Available Hours', f'{MONTHLY_AVAILABLE_HOURS:.1f} hours'],
+                ['Weekly Available Hours', f'{WEEKLY_AVAILABLE_HOURS:.2f} hours'],
+                ['Overall Efficiency Rate', f'{efficiency_rate:.1f}%'],
+                ['Target Efficiency Rate', f'{TARGET_EFFICIENCY_RATE:.1f}%'],
+                ['Status', efficiency_status]
+            ]
+
+            efficiency_table = Table(efficiency_data, colWidths=[3*inch, 3*inch])
+            efficiency_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('BACKGROUND', (0, 6), (-1, 6), colors.HexColor('#e0f2fe')),
+                ('FONTNAME', (0, 6), (-1, 6), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 6), (-1, 6), 11),
+                ('BACKGROUND', (0, 8), (-1, 8), colors.HexColor('#f0fdf4') if efficiency_rate >= TARGET_EFFICIENCY_RATE else colors.HexColor('#fef2f2')),
+                ('TEXTCOLOR', (1, 8), (1, 8), status_color),
+                ('FONTNAME', (0, 8), (-1, 8), 'Helvetica-Bold'),
+            ]))
+
+            story.append(efficiency_table)
+            story.append(Spacer(1, 20))
+
+            # ==================== TECHNICIAN PERFORMANCE ====================
+            story.append(Paragraph("TECHNICIAN PERFORMANCE", heading_style))
+            story.append(Spacer(1, 10))
+
+            # Get technician PM performance
+            cursor.execute('''
+                SELECT technician_name, COUNT(*) as count, SUM(labor_hours + labor_minutes/60.0) as total_hours
                 FROM pm_completions
-                WHERE completion_date BETWEEN %s AND %s
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
                 GROUP BY technician_name
                 ORDER BY count DESC
             ''', (start_date, end_date))
 
             tech_data = cursor.fetchall()
-
-            story.append(Paragraph("Technician Performance", styles['Heading2']))
 
             if tech_data:
                 tech_table_data = [['Technician', 'PMs Completed', 'Total Hours']]
@@ -1126,17 +1361,22 @@ class PMSchedulingTab(QWidget):
 
                 tech_table = Table(tech_table_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
                 tech_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2196F3')),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ('FONTSIZE', (0, 0), (-1, 0), 11),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                    ('TOPPADDING', (0, 0), (-1, -1), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
                 ]))
                 story.append(tech_table)
             else:
-                story.append(Paragraph("No technician data available.", styles['Normal']))
+                story.append(Paragraph("No technician data available.", body_style))
 
             # Build and save PDF
             doc.build(story)
