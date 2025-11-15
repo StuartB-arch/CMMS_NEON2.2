@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
+from psycopg2 import extras
 
 
 class CMPartsIntegrationDialog(QDialog):
@@ -257,7 +258,7 @@ class CMPartsIntegrationDialog(QDialog):
     def load_mro_parts(self):
         """Load all MRO parts from inventory"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT part_number, name, location, quantity_in_stock
                 FROM mro_inventory
@@ -413,7 +414,7 @@ class CMPartsIntegrationDialog(QDialog):
             return
 
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Record each consumed part
             for part in self.consumed_parts:
@@ -564,7 +565,7 @@ class CMPartsViewDialog(QDialog):
     def load_parts_data(self):
         """Load parts data from database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT
                     cp.part_number,

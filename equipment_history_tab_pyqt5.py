@@ -586,7 +586,7 @@ class EquipmentHistoryTab(QWidget):
     def load_equipment_list(self):
         """Load list of equipment from database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT bfm_equipment_no, short_description, status
                 FROM equipment
@@ -687,7 +687,7 @@ class EquipmentHistoryTab(QWidget):
 
     def get_pm_history(self, start_date: str, end_date: str) -> List[Dict]:
         """Get PM completion history"""
-        cursor = self.conn.cursor()
+        cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
         query = '''
             SELECT completion_date, pm_type, technician_name, labor_hours,
@@ -723,7 +723,7 @@ class EquipmentHistoryTab(QWidget):
 
     def get_cm_history(self, start_date: str, end_date: str) -> List[Dict]:
         """Get corrective maintenance history"""
-        cursor = self.conn.cursor()
+        cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
         query = '''
             SELECT cm_number, reported_date, closed_date, description, priority,
@@ -773,7 +773,7 @@ class EquipmentHistoryTab(QWidget):
 
     def get_parts_history(self, start_date: str, end_date: str) -> List[Dict]:
         """Get parts usage history"""
-        cursor = self.conn.cursor()
+        cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
         query = '''
             SELECT cpr.requested_date, cpr.part_number, cpr.model_number,
@@ -996,7 +996,7 @@ class EquipmentHistoryTab(QWidget):
             return
 
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Get equipment info
             cursor.execute('''
@@ -1086,7 +1086,7 @@ class EquipmentHistoryTab(QWidget):
             return
 
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Get comprehensive health metrics
             one_year_ago = QDate.currentDate().addYears(-1).toString("yyyy-MM-dd")

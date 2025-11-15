@@ -806,6 +806,8 @@ class AITCMMSSystemPyQt5(QMainWindow):
         print(f"Creating tabs for role: {self.current_user_role}")
 
         # Get database connection for tabs
+        # IMPORTANT: The connection will be used by tabs to create cursors
+        # Make sure tabs use cursor_factory=extras.RealDictCursor when creating cursors
         conn = db_pool.get_connection()
 
         if self.current_user_role == 'Manager':

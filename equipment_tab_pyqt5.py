@@ -21,6 +21,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
 import pandas as pd
 from datetime import datetime
+from psycopg2 import extras
 import traceback
 
 
@@ -219,7 +220,7 @@ class EquipmentTab(QWidget):
             # Rollback any failed transaction before starting
             self.conn.rollback()
 
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('SELECT * FROM equipment ORDER BY bfm_equipment_no')
             self.equipment_data = cursor.fetchall()
 
@@ -374,7 +375,7 @@ class EquipmentTab(QWidget):
     def populate_location_filter(self):
         """Populate location filter dropdown with distinct locations from database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT DISTINCT location
                 FROM equipment
@@ -411,7 +412,7 @@ class EquipmentTab(QWidget):
     def update_equipment_statistics(self):
         """Update equipment statistics display"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Get total assets count
             cursor.execute('SELECT COUNT(*) FROM equipment')
@@ -532,7 +533,7 @@ class EquipmentTab(QWidget):
             )
 
             if file_path:
-                cursor = self.conn.cursor()
+                cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
                 cursor.execute('''
                     SELECT id, sap_material_no, bfm_equipment_no, description,
                            tool_id_drawing_no, location, master_lin, monthly_pm,
@@ -627,7 +628,7 @@ class AddEquipmentDialog(QDialog):
     def save_equipment(self):
         """Save new equipment to database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 INSERT INTO equipment
                 (sap_material_no, bfm_equipment_no, description, tool_id_drawing_no,
@@ -678,7 +679,7 @@ class EditEquipmentDialog(QDialog):
     def load_equipment_data(self):
         """Load equipment data from database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('SELECT * FROM equipment WHERE bfm_equipment_no = %s', (self.bfm_no,))
             result = cursor.fetchone()
 
@@ -786,7 +787,7 @@ class EditEquipmentDialog(QDialog):
         # Pre-populate technician if asset is already Cannot Find
         if current_status == 'Cannot Find':
             try:
-                cursor = self.conn.cursor()
+                cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
                 cursor.execute('''
                     SELECT technician_name
                     FROM cannot_find_assets
@@ -881,7 +882,7 @@ class EditEquipmentDialog(QDialog):
 
             current_status = self.equipment_data.get('status') or 'Active'
 
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Update equipment table
             cursor.execute('''
@@ -1063,7 +1064,7 @@ class BulkEditPMCyclesDialog(QDialog):
         assets_text.setMaximumHeight(150)
 
         # Get asset details
-        cursor = self.conn.cursor()
+        cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
         for i, bfm in enumerate(self.selected_bfms[:20]):  # Show first 20
             cursor.execute('''
                 SELECT bfm_equipment_no, description
@@ -1162,7 +1163,7 @@ class BulkEditPMCyclesDialog(QDialog):
                 return
 
             # Apply changes
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             updated_count = 0
 
             for bfm in self.selected_bfms:
@@ -1324,7 +1325,7 @@ class CSVMappingDialog(QDialog):
             full_df = pd.read_csv(self.file_path, encoding='cp1252')
             full_df.columns = full_df.columns.str.strip()
 
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             imported_count = 0
             error_count = 0
 
