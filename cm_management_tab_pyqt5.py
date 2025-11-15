@@ -26,6 +26,7 @@ from PyQt5.QtCore import Qt, QDate, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QPalette
 from datetime import datetime, timedelta
 import psycopg2
+from psycopg2 import extras
 from typing import Optional, Callable, List, Tuple
 
 
