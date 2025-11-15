@@ -1,0 +1,37 @@
+# CMMS_NEON2.2 - Computerized Maintenance Management System
+# Complete dependency list for PyQt5 version
+
+# Core GUI Framework
+PyQt5==5.15.9
+PyQt5-sip==12.13.0
+
+# Database
+psycopg2-binary==2.9.9
+
+# Data Processing
+pandas==2.0.3
+numpy==1.24.3
+
+# PDF Generation
+reportlab==4.0.9
+
+# Image Processing
+Pillow==10.0.0
+
+# Excel Support
+openpyxl==3.1.2
+
+# Data Visualization
+matplotlib==3.7.2
+
+# Calendar Widget
+tkcalendar==1.6.1
+
+# Optional: Performance optimization
+python-dotenv==1.0.0
+
+# Optional: Database migrations
+alembic==1.12.0
+
+# Optional: Date/Time utilities
+python-dateutil==2.8.2
