@@ -131,6 +131,12 @@ class PMSchedulingTab(QWidget):
         btn_export.clicked.connect(self.export_weekly_schedule)
         layout.addWidget(btn_export)
 
+        # Monthly Summary Report button
+        btn_monthly_report = QPushButton("Monthly Summary Report")
+        btn_monthly_report.clicked.connect(self.generate_monthly_summary_report)
+        btn_monthly_report.setStyleSheet("QPushButton { background-color: #FF9800; color: white; }")
+        layout.addWidget(btn_monthly_report)
+
         layout.addStretch()
 
         group.setLayout(layout)
@@ -233,6 +239,11 @@ class PMSchedulingTab(QWidget):
 
         except Exception as e:
             print(f"Error populating week selector: {e}")
+            # Rollback failed transaction
+            try:
+                self.conn.rollback()
+            except:
+                pass
             QMessageBox.warning(self, "Warning", f"Error populating week selector: {str(e)}")
 
     def populate_technician_exclusion_list(self):
@@ -280,6 +291,11 @@ class PMSchedulingTab(QWidget):
 
         except Exception as e:
             print(f"Error loading latest weekly schedule: {e}")
+            # Rollback failed transaction
+            try:
+                self.conn.rollback()
+            except:
+                pass
 
     def generate_weekly_assignments(self):
         """
@@ -431,7 +447,12 @@ class PMSchedulingTab(QWidget):
                 # Populate table
                 table.setRowCount(len(assignments))
                 for row_idx, assignment in enumerate(assignments):
-                    bfm_no, description, pm_type, scheduled_date, status = assignment
+                    # assignment is now a dictionary from RealDictCursor
+                    bfm_no = assignment['bfm_equipment_no']
+                    description = assignment['description']
+                    pm_type = assignment['pm_type']
+                    scheduled_date = assignment['scheduled_date']
+                    status = assignment['status']
 
                     # Create table items
                     table.setItem(row_idx, 0, QTableWidgetItem(str(bfm_no or '')))
@@ -442,6 +463,11 @@ class PMSchedulingTab(QWidget):
 
             except Exception as e:
                 print(f"Error loading schedule for {technician}: {e}")
+                # Rollback failed transaction
+                try:
+                    self.conn.rollback()
+                except:
+                    pass
 
             table.setSortingEnabled(True)
 
@@ -538,24 +564,21 @@ class PMSchedulingTab(QWidget):
             for i, assignment in enumerate(assignments):
                 print(f"DEBUG: Processing assignment {i}: {assignment}")
 
-                # Safety check for assignment data
-                if not assignment or len(assignment) < 8:
+                # Safety check for assignment data - now a dictionary from RealDictCursor
+                if not assignment:
                     print(f"DEBUG: Skipping invalid assignment {i}")
                     continue
 
-                # Extract variables from assignment
-                bfm_no, sap_no, description, tool_id, location, master_lin, pm_type, scheduled_date, assigned_tech = assignment
-
-                # Add None checks for all variables
-                bfm_no = bfm_no or ''
-                sap_no = sap_no or ''
-                description = description or ''
-                tool_id = tool_id or ''
-                location = location or ''
-                master_lin = master_lin or ''
-                pm_type = pm_type or 'Monthly'
-                scheduled_date = scheduled_date or ''
-                assigned_tech = assigned_tech or technician
+                # Extract variables from assignment dictionary
+                bfm_no = assignment.get('bfm_equipment_no') or ''
+                sap_no = assignment.get('sap_material_no') or ''
+                description = assignment.get('description') or ''
+                tool_id = assignment.get('tool_id_drawing_no') or ''
+                location = assignment.get('location') or ''
+                master_lin = assignment.get('master_lin') or ''
+                pm_type = assignment.get('pm_type') or 'Monthly'
+                scheduled_date = assignment.get('scheduled_date') or ''
+                assigned_tech = assignment.get('assigned_technician') or technician
 
                 print(f"DEBUG: Processing {bfm_no} - {pm_type}")
 
@@ -913,6 +936,460 @@ class PMSchedulingTab(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to export weekly schedule: {str(e)}")
+            traceback.print_exc()
+
+    def generate_monthly_summary_report(self):
+        """Generate and export monthly PM summary report to PDF"""
+        try:
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton
+            from PyQt5.QtCore import Qt
+            from datetime import datetime
+
+            # Create date selection dialog
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Monthly PM Summary Report")
+            dialog.setGeometry(100, 100, 400, 150)
+
+            layout = QVBoxLayout()
+
+            # Month selection
+            month_layout = QHBoxLayout()
+            month_layout.addWidget(QLabel("Select Month:"))
+            month_combo = QComboBox()
+            months = ['January', 'February', 'March', 'April', 'May', 'June',
+                     'July', 'August', 'September', 'October', 'November', 'December']
+            month_combo.addItems(months)
+            current_month = datetime.now().month - 1
+            month_combo.setCurrentIndex(current_month)
+            month_layout.addWidget(month_combo)
+            layout.addLayout(month_layout)
+
+            # Year selection
+            year_layout = QHBoxLayout()
+            year_layout.addWidget(QLabel("Select Year:"))
+            year_combo = QComboBox()
+            current_year = datetime.now().year
+            for year in range(current_year - 2, current_year + 1):
+                year_combo.addItem(str(year))
+            year_combo.setCurrentIndex(2)  # Current year
+            year_layout.addWidget(year_combo)
+            layout.addLayout(year_layout)
+
+            # Buttons
+            button_layout = QHBoxLayout()
+
+            ok_button = QPushButton("Generate PDF")
+            ok_button.clicked.connect(dialog.accept)
+            button_layout.addWidget(ok_button)
+
+            cancel_button = QPushButton("Cancel")
+            cancel_button.clicked.connect(dialog.reject)
+            button_layout.addWidget(cancel_button)
+
+            layout.addLayout(button_layout)
+            layout.addStretch()
+
+            dialog.setLayout(layout)
+
+            if dialog.exec_() == QDialog.Accepted:
+                selected_month = month_combo.currentIndex() + 1
+                selected_year = int(year_combo.currentText())
+                self.export_monthly_summary_pdf(selected_month, selected_year)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to generate report: {str(e)}")
+            traceback.print_exc()
+
+    def export_monthly_summary_pdf(self, month: int, year: int):
+        """Generate comprehensive monthly PM summary as PDF with all data"""
+        try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT
+            from datetime import datetime, timedelta
+            import calendar
+
+            # Create filename
+            month_name = calendar.month_name[month]
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            default_filename = f"AIT_Monthly_Report_{month_name}_{year}_{timestamp}.pdf"
+
+            # Open file dialog
+            filename, _ = QFileDialog.getSaveFileName(
+                self,
+                "Export Monthly Summary",
+                default_filename,
+                "PDF Files (*.pdf);;All Files (*)"
+            )
+
+            if not filename:
+                return
+
+            # Create PDF document
+            doc = SimpleDocTemplate(filename, pagesize=letter,
+                                  rightMargin=36, leftMargin=36,
+                                  topMargin=50, bottomMargin=36)
+
+            styles = getSampleStyleSheet()
+            story = []
+
+            # ==================== CUSTOM STYLES ====================
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                textColor=colors.HexColor('#1a365d'),
+                spaceAfter=30,
+                alignment=TA_CENTER,
+                fontName='Helvetica-Bold'
+            )
+
+            heading_style = ParagraphStyle(
+                'CustomHeading',
+                parent=styles['Heading2'],
+                fontSize=14,
+                textColor=colors.HexColor('#2c5282'),
+                spaceAfter=12,
+                spaceBefore=12,
+                fontName='Helvetica-Bold'
+            )
+
+            body_style = ParagraphStyle(
+                'CustomBody',
+                parent=styles['Normal'],
+                fontSize=10,
+                textColor=colors.HexColor('#2d3748'),
+                spaceAfter=6,
+                fontName='Helvetica'
+            )
+
+            # ==================== TITLE PAGE ====================
+            story.append(Paragraph("AIRBUS AIT", title_style))
+            story.append(Paragraph("Monthly Maintenance Summary Report",
+                                ParagraphStyle('Subtitle', parent=styles['Normal'],
+                                           fontSize=16, alignment=TA_CENTER,
+                                           textColor=colors.HexColor('#4a5568'))))
+            story.append(Spacer(1, 20))
+
+            # Report metadata box
+            meta_data = [
+                ['Report Period:', f'{month_name} {year}'],
+                ['Generated:', datetime.now().strftime('%B %d, %Y at %I:%M %p')],
+                ['Report Type:', 'Comprehensive Monthly Summary']
+            ]
+
+            meta_table = Table(meta_data, colWidths=[2*inch, 4*inch])
+            meta_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e2e8f0')),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2d3748')),
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+
+            story.append(meta_table)
+            story.append(Spacer(1, 30))
+
+            # ==================== EXECUTIVE SUMMARY ====================
+            story.append(Paragraph("EXECUTIVE SUMMARY", heading_style))
+            story.append(Spacer(1, 10))
+
+            # Get PM summary data
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
+
+            start_date = f"{year}-{month:02d}-01"
+            last_day = calendar.monthrange(year, month)[1]
+            end_date = f"{year}-{month:02d}-{last_day}"
+
+            cursor.execute('''
+                SELECT
+                    COUNT(*) as total_completions,
+                    SUM(labor_hours + labor_minutes/60.0) as total_hours,
+                    AVG(labor_hours + labor_minutes/60.0) as avg_hours
+                FROM pm_completions
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
+            ''', (start_date, end_date))
+
+            pm_result = cursor.fetchone()
+            pm_completions = pm_result['total_completions'] or 0
+            pm_total_hours = pm_result['total_hours'] or 0.0
+            pm_avg_hours = pm_result['avg_hours'] or 0.0
+
+            # Get CM created this month
+            cursor.execute('''
+                SELECT COUNT(*) as count FROM corrective_maintenance
+                WHERE created_date::date BETWEEN %s::date AND %s::date
+            ''', (start_date, end_date))
+            cms_created = cursor.fetchone()['count'] or 0
+
+            # Get CM closed this month
+            cursor.execute('''
+                SELECT COUNT(*) as count FROM corrective_maintenance
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date))
+            cms_closed = cursor.fetchone()['count'] or 0
+
+            # Summary highlights table
+            summary_data = [
+                ['METRIC', 'VALUE'],
+                ['PM Completions', f'{pm_completions:,}'],
+                ['Total PM Labor Hours', f'{pm_total_hours:.1f} hrs'],
+                ['Average Time per PM', f'{pm_avg_hours:.1f} hrs'],
+                ['CMs Created', f'{cms_created:,}'],
+                ['CMs Closed', f'{cms_closed:,}']
+            ]
+
+            summary_table = Table(summary_data, colWidths=[3.5*inch, 2.5*inch])
+            summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 11),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f7fafc')])
+            ]))
+
+            story.append(summary_table)
+            story.append(Spacer(1, 25))
+
+            # ==================== CORRECTIVE MAINTENANCE DETAIL ====================
+            story.append(Paragraph("CORRECTIVE MAINTENANCE ANALYSIS", heading_style))
+            story.append(Spacer(1, 10))
+
+            # Get CM breakdown data
+            cursor.execute('''
+                SELECT COUNT(*) as count FROM corrective_maintenance
+                WHERE created_date::date BETWEEN %s::date AND %s::date
+                AND completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date, start_date, end_date))
+            cms_created_and_closed = cursor.fetchone()['count'] or 0
+
+            cursor.execute('''
+                SELECT COUNT(*) as count FROM corrective_maintenance
+                WHERE NOT (created_date::date BETWEEN %s::date AND %s::date)
+                AND completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date, start_date, end_date))
+            cms_closed_from_before = cursor.fetchone()['count'] or 0
+
+            cursor.execute("SELECT COUNT(*) as count FROM corrective_maintenance WHERE status = 'Open'")
+            cms_open_current = cursor.fetchone()['count'] or 0
+
+            # Get CM labor hours
+            cursor.execute('''
+                SELECT
+                    SUM(labor_hours) as total_hours,
+                    AVG(labor_hours) as avg_hours
+                FROM corrective_maintenance
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date))
+
+            cm_hours_result = cursor.fetchone()
+            cm_total_hours = cm_hours_result['total_hours'] or 0.0
+            cm_avg_hours = cm_hours_result['avg_hours'] or 0.0
+
+            # Get days to close
+            cursor.execute('''
+                SELECT
+                    SUM(completion_date::date - created_date::date) as total_days_to_close,
+                    AVG(completion_date::date - created_date::date) as avg_days_to_close
+                FROM corrective_maintenance
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
+                AND status IN ('Closed', 'Completed')
+            ''', (start_date, end_date))
+
+            closed_days_result = cursor.fetchone()
+            cms_total_days_to_close = closed_days_result['total_days_to_close'] or 0
+            cms_avg_days_to_close = closed_days_result['avg_days_to_close'] or 0.0
+
+            # CM breakdown table
+            cm_breakdown_data = [
+                ['CATEGORY', 'VALUE'],
+                ['CMs Created This Month', str(cms_created)],
+                ['CMs Closed This Month', str(cms_closed)],
+                ['  - Created & Closed Same Month', str(cms_created_and_closed)],
+                [f'  - Carried Over from Prior Months', str(cms_closed_from_before)]
+            ]
+
+            if cms_closed > 0:
+                cm_breakdown_data.extend([
+                    ['  - Total Days to Close (All Closed CMs)', f'{int(cms_total_days_to_close)} days'],
+                    ['  - Average Days to Close per CM', f'{cms_avg_days_to_close:.1f} days']
+                ])
+
+            cm_breakdown_data.extend([
+                ['CM Total Labor Hours (Closed)', f'{cm_total_hours:.1f} hours'],
+                ['CM Average Hours per Closure', f'{cm_avg_hours:.1f} hours'],
+                ['Currently Open CMs', str(cms_open_current)]
+            ])
+
+            cm_table = Table(cm_breakdown_data, colWidths=[4.5*inch, 1.5*inch])
+            cm_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('BACKGROUND', (0, 1), (-1, 2), colors.white),
+                ('BACKGROUND', (0, 3), (-1, -1), colors.HexColor('#f7fafc')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('LEFTPADDING', (0, 3), (0, 4), 24),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+
+            story.append(cm_table)
+            story.append(Spacer(1, 20))
+
+            # ==================== OVERALL MAINTENANCE EFFICIENCY ====================
+            story.append(Paragraph("OVERALL MAINTENANCE EFFICIENCY", heading_style))
+            story.append(Spacer(1, 10))
+
+            # Efficiency calculation
+            TOTAL_TECHNICIANS = 9
+            ANNUAL_HOURS_PER_TECHNICIAN = 1980
+            MONTHLY_AVAILABLE_HOURS = (TOTAL_TECHNICIANS * ANNUAL_HOURS_PER_TECHNICIAN) / 12
+            WEEKLY_AVAILABLE_HOURS = 342.69
+            TARGET_EFFICIENCY_RATE = 80.0
+
+            # Calculate total maintenance hours
+            total_maintenance_hours = pm_total_hours + cm_total_hours
+            efficiency_rate = (total_maintenance_hours / MONTHLY_AVAILABLE_HOURS) * 100 if MONTHLY_AVAILABLE_HOURS > 0 else 0.0
+
+            # Determine status and color
+            if efficiency_rate >= TARGET_EFFICIENCY_RATE:
+                efficiency_status = "MEETS TARGET ✓"
+                status_color = colors.HexColor('#22c55e')
+            else:
+                efficiency_status = "BELOW TARGET ✗"
+                status_color = colors.HexColor('#ef4444')
+
+            # Build efficiency data table
+            efficiency_data = [
+                ['METRIC', 'VALUE'],
+                ['Total PM Hours', f'{pm_total_hours:.1f} hours'],
+                ['Total CM Hours', f'{cm_total_hours:.1f} hours'],
+                ['Total Maintenance Hours', f'{total_maintenance_hours:.1f} hours'],
+                ['Monthly Available Hours', f'{MONTHLY_AVAILABLE_HOURS:.1f} hours'],
+                ['Weekly Available Hours', f'{WEEKLY_AVAILABLE_HOURS:.2f} hours'],
+                ['Overall Efficiency Rate', f'{efficiency_rate:.1f}%'],
+                ['Target Efficiency Rate', f'{TARGET_EFFICIENCY_RATE:.1f}%'],
+                ['Status', efficiency_status]
+            ]
+
+            efficiency_table = Table(efficiency_data, colWidths=[3*inch, 3*inch])
+            efficiency_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('BACKGROUND', (0, 6), (-1, 6), colors.HexColor('#e0f2fe')),
+                ('FONTNAME', (0, 6), (-1, 6), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 6), (-1, 6), 11),
+                ('BACKGROUND', (0, 8), (-1, 8), colors.HexColor('#f0fdf4') if efficiency_rate >= TARGET_EFFICIENCY_RATE else colors.HexColor('#fef2f2')),
+                ('TEXTCOLOR', (1, 8), (1, 8), status_color),
+                ('FONTNAME', (0, 8), (-1, 8), 'Helvetica-Bold'),
+            ]))
+
+            story.append(efficiency_table)
+            story.append(Spacer(1, 20))
+
+            # ==================== TECHNICIAN PERFORMANCE ====================
+            story.append(Paragraph("TECHNICIAN PERFORMANCE", heading_style))
+            story.append(Spacer(1, 10))
+
+            # Get technician PM performance
+            cursor.execute('''
+                SELECT technician_name, COUNT(*) as count, SUM(labor_hours + labor_minutes/60.0) as total_hours
+                FROM pm_completions
+                WHERE completion_date::date BETWEEN %s::date AND %s::date
+                GROUP BY technician_name
+                ORDER BY count DESC
+            ''', (start_date, end_date))
+
+            tech_data = cursor.fetchall()
+
+            if tech_data:
+                tech_table_data = [['Technician', 'PMs Completed', 'Total Hours']]
+
+                for row in tech_data:
+                    tech_name = row['technician_name'] or 'Unknown'
+                    count = row['count'] or 0
+                    hours = row['total_hours'] or 0
+                    tech_table_data.append([tech_name, str(count), f"{hours:.1f}"])
+
+                tech_table = Table(tech_table_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
+                tech_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 11),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e0')),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                    ('TOPPADDING', (0, 0), (-1, -1), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ]))
+                story.append(tech_table)
+            else:
+                story.append(Paragraph("No technician data available.", body_style))
+
+            # Build and save PDF
+            doc.build(story)
+
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Monthly report generated successfully!\n\nSaved to:\n{filename}"
+            )
+            self.status_updated.emit(f"Monthly summary report generated: {filename}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to export PDF: {str(e)}")
             traceback.print_exc()
 
     def update_status(self, message):
