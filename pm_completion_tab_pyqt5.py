@@ -83,7 +83,12 @@ class EquipmentPMHistoryDialog(QDialog):
 
             if completions:
                 self.history_table.setRowCount(len(completions))
-                for row, (pm_type, tech, date, hours, notes) in enumerate(completions):
+                for row, completion in enumerate(completions):
+                    pm_type = completion['pm_type']
+                    tech = completion['technician_name']
+                    date = completion['completion_date']
+                    hours = completion['total_hours']
+                    notes = completion['notes']
                     self.history_table.setItem(row, 0, QTableWidgetItem(str(date)))
                     self.history_table.setItem(row, 1, QTableWidgetItem(pm_type))
                     self.history_table.setItem(row, 2, QTableWidgetItem(tech))
@@ -312,7 +317,7 @@ class PMCompletionTab(QWidget):
             """)
 
             rows = cursor.fetchall()
-            self.technicians = [row[0] for row in rows]
+            self.technicians = [row['full_name'] for row in rows]
 
             print(f"Loaded {len(self.technicians)} technicians from database")
 
@@ -343,7 +348,7 @@ class PMCompletionTab(QWidget):
                 ORDER BY bfm_equipment_no
             ''')
 
-            self.equipment_list = [row[0] for row in cursor.fetchall()]
+            self.equipment_list = [row['bfm_equipment_no'] for row in cursor.fetchall()]
             print(f"Loaded {len(self.equipment_list)} equipment items")
 
         except Exception as e:
@@ -361,7 +366,7 @@ class PMCompletionTab(QWidget):
                     ORDER BY bfm_equipment_no LIMIT 20
                 ''', (f'%{text.lower()}%', f'%{text.lower()}%'))
 
-                suggestions = [row[0] for row in cursor.fetchall()]
+                suggestions = [row['bfm_equipment_no'] for row in cursor.fetchall()]
 
                 # Update combo box items
                 self.bfm_input.clear()
@@ -392,7 +397,12 @@ class PMCompletionTab(QWidget):
 
             # Add completions to table
             self.completions_table.setRowCount(len(completions))
-            for row, (date, bfm_no, pm_type, tech, hours) in enumerate(completions):
+            for row, completion in enumerate(completions):
+                date = completion['completion_date']
+                bfm_no = completion['bfm_equipment_no']
+                pm_type = completion['pm_type']
+                tech = completion['technician_name']
+                hours = completion['total_hours']
                 self.completions_table.setItem(row, 0, QTableWidgetItem(str(date)))
                 self.completions_table.setItem(row, 1, QTableWidgetItem(bfm_no))
                 self.completions_table.setItem(row, 2, QTableWidgetItem(pm_type))
@@ -418,34 +428,34 @@ class PMCompletionTab(QWidget):
             cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Total completions
-            cursor.execute('SELECT COUNT(*) FROM pm_completions')
-            total = cursor.fetchone()[0]
+            cursor.execute('SELECT COUNT(*) as count FROM pm_completions')
+            total = cursor.fetchone()['count']
             self.total_completions_label.setText(f"Total Completions: {total}")
 
             # Monthly completions
             cursor.execute('''
-                SELECT COUNT(*) FROM pm_completions
+                SELECT COUNT(*) as count FROM pm_completions
                 WHERE pm_type = 'Monthly'
             ''')
-            monthly = cursor.fetchone()[0]
+            monthly = cursor.fetchone()['count']
             self.monthly_completions_label.setText(f"Monthly: {monthly}")
 
             # Annual completions
             cursor.execute('''
-                SELECT COUNT(*) FROM pm_completions
+                SELECT COUNT(*) as count FROM pm_completions
                 WHERE pm_type = 'Annual'
             ''')
-            annual = cursor.fetchone()[0]
+            annual = cursor.fetchone()['count']
             self.annual_completions_label.setText(f"Annual: {annual}")
 
             # This week completions
             week_start = self.get_week_start(datetime.now())
             week_end = week_start + timedelta(days=6)
             cursor.execute('''
-                SELECT COUNT(*) FROM pm_completions
+                SELECT COUNT(*) as count FROM pm_completions
                 WHERE completion_date BETWEEN %s AND %s
             ''', (week_start.strftime('%Y-%m-%d'), week_end.strftime('%Y-%m-%d')))
-            weekly = cursor.fetchone()[0]
+            weekly = cursor.fetchone()['count']
             self.weekly_completions_label.setText(f"This Week: {weekly}")
 
         except Exception as e:

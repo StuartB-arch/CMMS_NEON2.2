@@ -382,7 +382,7 @@ class EquipmentTab(QWidget):
                 WHERE location IS NOT NULL AND location != ''
                 ORDER BY location
             ''')
-            locations = [row[0] for row in cursor.fetchall()]
+            locations = [row['location'] for row in cursor.fetchall()]
 
             # Save current selection
             current_location = self.location_combo.currentText()
@@ -1073,8 +1073,8 @@ class BulkEditPMCyclesDialog(QDialog):
             ''', (bfm,))
             result = cursor.fetchone()
             if result:
-                desc = result[1][:40] if result[1] else ''
-                assets_text.append(f"- {result[0]} - {desc}")
+                desc = result['description'][:40] if result['description'] else ''
+                assets_text.append(f"- {result['bfm_equipment_no']} - {desc}")
 
         if len(self.selected_bfms) > 20:
             assets_text.append(f"\n... and {len(self.selected_bfms) - 20} more assets")

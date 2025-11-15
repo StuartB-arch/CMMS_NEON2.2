@@ -211,7 +211,7 @@ class PMSchedulingTab(QWidget):
                 FROM weekly_pm_schedules
                 ORDER BY week_start_date DESC
             ''')
-            available_weeks = [row[0] for row in cursor.fetchall()]
+            available_weeks = [str(row['week_start_date']) for row in cursor.fetchall()]
 
             # Always include current week as an option
             current_week = self.current_week_start.strftime('%Y-%m-%d')
@@ -265,11 +265,12 @@ class PMSchedulingTab(QWidget):
 
             if latest_week:
                 # Find the index of this week in the combo box
-                index = self.week_combo.findText(latest_week[0])
+                week_start = str(latest_week['week_start_date'])
+                index = self.week_combo.findText(week_start)
                 if index >= 0:
                     self.week_combo.setCurrentIndex(index)
                 self.refresh_technician_schedules()
-                self.status_updated.emit(f"Loaded latest weekly schedule: {latest_week[0]}")
+                self.status_updated.emit(f"Loaded latest weekly schedule: {week_start}")
             else:
                 self.status_updated.emit("No weekly schedules found")
 
