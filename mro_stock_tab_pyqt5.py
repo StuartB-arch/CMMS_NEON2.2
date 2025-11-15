@@ -385,7 +385,7 @@ class AddEditPartDialog(QDialog):
             return
 
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             if self.is_edit_mode:
                 # Update existing part
@@ -579,7 +579,7 @@ class PartDetailsDialog(QDialog):
     def load_data(self):
         """Load all data for the part"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Get part data
             cursor.execute('''
@@ -723,7 +723,7 @@ class PartDetailsDialog(QDialog):
     def load_cm_history(self, part_data):
         """Load CM usage history"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             self.cm_header_label.setText(f"Corrective Maintenance History for {self.part_number}")
 
@@ -804,7 +804,7 @@ class PartDetailsDialog(QDialog):
     def load_transactions(self):
         """Load all stock transactions"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             self.trans_header_label.setText(f"All Stock Transactions for {self.part_number}")
 
@@ -942,7 +942,7 @@ class StockTransactionDialog(QDialog):
     def load_current_stock(self):
         """Load current stock information"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT quantity_in_stock, unit_of_measure, name
                 FROM mro_inventory
@@ -987,7 +987,7 @@ class StockTransactionDialog(QDialog):
                 QMessageBox.critical(self, "Error", "Cannot remove more stock than available!")
                 return
 
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Update stock
             cursor.execute('''
@@ -1204,7 +1204,7 @@ class CSVImportDialog(QDialog):
                             continue
 
                         # Insert into database
-                        cursor = self.conn.cursor()
+                        cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
                         cursor.execute('''
                             INSERT INTO mro_inventory (
                                 name, part_number, model_number, equipment, engineering_system,
@@ -1279,7 +1279,7 @@ class MROStockTab(QWidget):
     def init_database(self):
         """Initialize database tables and indexes"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Create mro_inventory table
             cursor.execute('''
@@ -1600,7 +1600,7 @@ class MROStockTab(QWidget):
 
             query += ' ORDER BY part_number'
 
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute(query, params)
             results = cursor.fetchall()
 
@@ -1657,7 +1657,7 @@ class MROStockTab(QWidget):
     def update_location_filter(self):
         """Update location filter dropdown"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT DISTINCT location
                 FROM mro_inventory
@@ -1682,7 +1682,7 @@ class MROStockTab(QWidget):
     def update_statistics(self):
         """Update inventory statistics"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Combined query for efficiency
             cursor.execute('''
@@ -1725,7 +1725,7 @@ class MROStockTab(QWidget):
 
         # Get full part data
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT id, name, part_number, model_number, equipment, engineering_system,
                        unit_of_measure, quantity_in_stock, unit_price, minimum_stock,
@@ -1771,7 +1771,7 @@ class MROStockTab(QWidget):
 
         if reply == QMessageBox.Yes:
             try:
-                cursor = self.conn.cursor()
+                cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
                 cursor.execute('DELETE FROM mro_inventory WHERE part_number = %s', (part_number,))
                 self.conn.commit()
 
@@ -1831,7 +1831,7 @@ class MROStockTab(QWidget):
             return
 
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT id, name, part_number, model_number, equipment, engineering_system,
                        unit_of_measure, quantity_in_stock, unit_price, minimum_stock,
@@ -1869,7 +1869,7 @@ class MROStockTab(QWidget):
     def generate_stock_report(self):
         """Generate comprehensive stock report"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             report = []
             report.append("=" * 80)
@@ -1983,7 +1983,7 @@ class MROStockTab(QWidget):
     def show_low_stock_alert(self):
         """Show low stock alert dialog"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT part_number, name, quantity_in_stock, minimum_stock,
                        unit_of_measure, location, supplier

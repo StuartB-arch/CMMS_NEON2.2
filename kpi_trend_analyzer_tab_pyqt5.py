@@ -21,6 +21,7 @@ from PyQt5.QtGui import QFont, QColor
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from collections import defaultdict
+from psycopg2 import extras
 import statistics
 import csv
 
@@ -73,7 +74,7 @@ class KPITrendAnalyzer:
         Returns:
             List of historical data points
         """
-        cursor = self.conn.cursor()
+        cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
         # Calculate start period
         end_date = datetime.now()

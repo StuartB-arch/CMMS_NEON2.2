@@ -24,6 +24,7 @@ from PyQt5.QtGui import QFont, QColor
 import pandas as pd
 from datetime import datetime, timedelta
 import traceback
+from psycopg2 import extras
 import os
 import json
 
@@ -204,7 +205,7 @@ class PMSchedulingTab(QWidget):
     def populate_week_selector(self):
         """Populate dropdown with weeks that have schedules"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT DISTINCT week_start_date
                 FROM weekly_pm_schedules
@@ -250,7 +251,7 @@ class PMSchedulingTab(QWidget):
     def load_latest_weekly_schedule(self):
         """Load the most recent weekly schedule on startup"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Find the most recent week with scheduled PMs
             cursor.execute('''
@@ -407,7 +408,7 @@ class PMSchedulingTab(QWidget):
 
             # Load scheduled PMs for this technician
             try:
-                cursor = self.conn.cursor()
+                cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
                 cursor.execute('''
                     SELECT ws.bfm_equipment_no, e.description, ws.pm_type, ws.scheduled_date, ws.status
                     FROM weekly_pm_schedules ws
@@ -445,7 +446,7 @@ class PMSchedulingTab(QWidget):
             forms_dir = f"PM_Forms_Week_{week_start}_{timestamp}"
             os.makedirs(forms_dir, exist_ok=True)
 
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Generate forms for each technician
             forms_generated = 0
@@ -589,7 +590,7 @@ class PMSchedulingTab(QWidget):
                 special_instructions = None
                 safety_notes = None
 
-                cursor = self.conn.cursor()
+                cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
                 cursor.execute('''
                     SELECT checklist_items, estimated_hours, special_instructions, safety_notes
                     FROM pm_templates
@@ -856,7 +857,7 @@ class PMSchedulingTab(QWidget):
             if not filename:
                 return
 
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT ws.assigned_technician, ws.bfm_equipment_no, e.description,
                        ws.pm_type, ws.scheduled_date, ws.status

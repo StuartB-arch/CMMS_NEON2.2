@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
+from psycopg2 import extras
 from database_utils import db_pool, UserManager, AuditLogger
 
 

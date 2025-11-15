@@ -68,7 +68,7 @@ class EquipmentPMHistoryDialog(QDialog):
     def load_history(self):
         """Load and display PM history for the equipment"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT pm_type, technician_name, completion_date,
                     (labor_hours + labor_minutes/60.0) as total_hours,
@@ -303,7 +303,7 @@ class PMCompletionTab(QWidget):
     def load_technicians(self):
         """Load technicians list from database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute("""
                 SELECT full_name FROM users
                 WHERE role = 'Technician'
@@ -336,7 +336,7 @@ class PMCompletionTab(QWidget):
     def load_equipment_list(self):
         """Load equipment list for autocomplete"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT bfm_equipment_no FROM equipment
                 ORDER BY bfm_equipment_no
@@ -353,7 +353,7 @@ class PMCompletionTab(QWidget):
         """Update equipment autocomplete suggestions"""
         if len(text) >= 2:
             try:
-                cursor = self.conn.cursor()
+                cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
                 cursor.execute('''
                     SELECT bfm_equipment_no FROM equipment
                     WHERE LOWER(bfm_equipment_no) LIKE %s OR LOWER(description) LIKE %s
@@ -373,7 +373,7 @@ class PMCompletionTab(QWidget):
     def load_recent_completions(self):
         """Load and display recent PM completions"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT completion_date, bfm_equipment_no, pm_type, technician_name,
                     (labor_hours + labor_minutes/60.0) as total_hours
@@ -414,7 +414,7 @@ class PMCompletionTab(QWidget):
     def update_statistics(self):
         """Update completion statistics display"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Total completions
             cursor.execute('SELECT COUNT(*) FROM pm_completions')
@@ -697,7 +697,7 @@ class PMCompletionTab(QWidget):
             else:
                 completion_date = datetime.now().strftime('%Y-%m-%d')
 
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Ensure clean transaction state
             try:

@@ -273,7 +273,7 @@ class CMManagementTab(QWidget):
     def load_corrective_maintenance(self):
         """Load corrective maintenance data with enhanced source tracking"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT cm_number, bfm_equipment_no, description, priority,
                     assigned_technician, status, created_date, notes
@@ -343,7 +343,7 @@ class CMManagementTab(QWidget):
     def load_missing_parts_list(self):
         """Load equipment missing parts data"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Fetch all missing parts records
             cursor.execute('''
@@ -381,7 +381,7 @@ class CMManagementTab(QWidget):
     def update_statistics(self):
         """Update CM statistics display"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Total CMs
             cursor.execute("SELECT COUNT(*) FROM corrective_maintenance")
@@ -656,7 +656,7 @@ class CreateCMDialog(QDialog):
     def generate_next_cm_number(self) -> str:
         """Generate next CM number in format CM-YYYYMMDD-XXXX"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             today = datetime.now().strftime('%Y%m%d')
 
             cursor.execute(
@@ -680,7 +680,7 @@ class CreateCMDialog(QDialog):
     def load_equipment_list(self):
         """Load active equipment list"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute(
                 "SELECT DISTINCT bfm_equipment_no FROM equipment "
                 "WHERE status = 'Active' ORDER BY bfm_equipment_no"
@@ -736,7 +736,7 @@ class CreateCMDialog(QDialog):
 
         # Save to database
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 INSERT INTO corrective_maintenance
                 (cm_number, bfm_equipment_no, description, priority, assigned_technician, created_date)
@@ -792,7 +792,7 @@ class EditCMDialog(QDialog):
     def load_cm_data(self):
         """Load CM data from database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT cm_number, bfm_equipment_no, description, priority, assigned_technician,
                     status, created_date, completion_date, labor_hours, notes, root_cause, corrective_action
@@ -931,7 +931,7 @@ class EditCMDialog(QDialog):
 
         if self.parts_integration:
             # Check if parts were used
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('SELECT COUNT(*) FROM cm_parts_used WHERE cm_number = %s',
                          (self.orig_cm_number,))
             parts_count = cursor.fetchone()[0]
@@ -953,7 +953,7 @@ class EditCMDialog(QDialog):
     def load_equipment_list(self):
         """Load equipment list"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('SELECT bfm_equipment_no FROM equipment ORDER BY bfm_equipment_no')
             equipment_list = [row[0] for row in cursor.fetchall()]
             self.equipment_combo.addItems(equipment_list)
@@ -970,7 +970,7 @@ class EditCMDialog(QDialog):
             return
 
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Convert labor hours
             labor_hours = None
@@ -1032,7 +1032,7 @@ class EditCMDialog(QDialog):
 
         if reply == QMessageBox.Yes:
             try:
-                cursor = self.conn.cursor()
+                cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
                 # Delete child records first
                 cursor.execute('DELETE FROM cm_parts_requests WHERE cm_number = %s',
                              (self.orig_cm_number,))
@@ -1079,7 +1079,7 @@ class CompleteCMDialog(QDialog):
     def load_cm_data(self):
         """Load CM data from database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT cm_number, bfm_equipment_no, description, assigned_technician,
                     status, labor_hours, notes, root_cause, corrective_action
@@ -1233,7 +1233,7 @@ class CompleteCMDialog(QDialog):
             return
 
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Update CM record
             cursor.execute('''
@@ -1390,7 +1390,7 @@ class CreateMissingPartsDialog(QDialog):
     def generate_next_emp_number(self) -> str:
         """Generate next EMP number in format EMP-YYYYMMDD-XXXX"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             today = datetime.now().strftime('%Y%m%d')
 
             cursor.execute(
@@ -1414,7 +1414,7 @@ class CreateMissingPartsDialog(QDialog):
     def load_equipment_list(self):
         """Load active equipment list"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute(
                 "SELECT DISTINCT bfm_equipment_no FROM equipment "
                 "WHERE status = 'Active' ORDER BY bfm_equipment_no"
@@ -1466,7 +1466,7 @@ class CreateMissingPartsDialog(QDialog):
 
         # Save to database
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 INSERT INTO equipment_missing_parts
                 (emp_number, bfm_equipment_no, description, priority, assigned_technician,
@@ -1526,7 +1526,7 @@ class EditMissingPartsDialog(QDialog):
     def load_emp_data(self):
         """Load EMP data from database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT emp_number, bfm_equipment_no, description, priority, assigned_technician,
                     status, reported_date, missing_parts_description, notes, reported_by,
@@ -1633,7 +1633,7 @@ class EditMissingPartsDialog(QDialog):
     def load_equipment_list(self):
         """Load equipment list"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('SELECT bfm_equipment_no FROM equipment ORDER BY bfm_equipment_no')
             equipment_list = [row[0] for row in cursor.fetchall()]
             self.equipment_combo.addItems(equipment_list)
@@ -1644,7 +1644,7 @@ class EditMissingPartsDialog(QDialog):
     def save_changes(self):
         """Save changes to entry"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 UPDATE equipment_missing_parts SET
                 bfm_equipment_no = %s,
@@ -1691,7 +1691,7 @@ class EditMissingPartsDialog(QDialog):
 
         if reply == QMessageBox.Yes:
             try:
-                cursor = self.conn.cursor()
+                cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
                 cursor.execute('DELETE FROM equipment_missing_parts WHERE emp_number = %s',
                              (self.orig_emp_number,))
                 self.conn.commit()
@@ -1728,7 +1728,7 @@ class CloseMissingPartsDialog(QDialog):
     def load_emp_data(self):
         """Load EMP data from database"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 SELECT emp_number, bfm_equipment_no, description, status, missing_parts_description
                 FROM equipment_missing_parts
@@ -1812,7 +1812,7 @@ class CloseMissingPartsDialog(QDialog):
         closure_notes = self.closure_notes_text.toPlainText().strip()
 
         try:
-            cursor = self.conn.cursor()
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('''
                 UPDATE equipment_missing_parts
                 SET status = 'Closed',
