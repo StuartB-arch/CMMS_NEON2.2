@@ -13,6 +13,7 @@ with the following features:
 - Database transaction safety
 """
 
+from psycopg2 import extras
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
     QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit,

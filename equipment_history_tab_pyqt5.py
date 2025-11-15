@@ -13,6 +13,7 @@ This module provides comprehensive equipment history tracking including:
 - Interactive timeline visualization with tooltips
 """
 
+from psycopg2 import extras
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QLineEdit, QComboBox, QDialog, QFormLayout,

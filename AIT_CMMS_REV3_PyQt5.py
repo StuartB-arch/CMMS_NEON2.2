@@ -283,7 +283,7 @@ class LoginDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("AIT CMMS - User Login")
-        self.setFixedSize(500, 350)
+        self.setFixedSize(550, 400)  # Increased size for better readability
         self.setModal(True)
 
         # Center the dialog
@@ -308,7 +308,7 @@ class LoginDialog(QDialog):
         self.move(x, y)
 
     def apply_stylesheet(self):
-        """Apply professional stylesheet"""
+        """Apply professional stylesheet with improved readability"""
         self.setStyleSheet("""
             QDialog {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -316,22 +316,30 @@ class LoginDialog(QDialog):
             }
             QLabel {
                 color: white;
+                font-size: 12pt;
             }
             QLineEdit {
-                padding: 10px;
+                padding: 12px;
                 border: 2px solid #3498db;
                 border-radius: 5px;
                 background: white;
-                font-size: 11pt;
+                color: #2c3e50;
+                font-size: 13pt;
+            }
+            QLineEdit:focus {
+                border: 2px solid #2980b9;
+                background-color: #ecf0f1;
             }
             QPushButton {
-                padding: 10px 30px;
+                padding: 12px 40px;
                 border: none;
                 border-radius: 5px;
                 background-color: #3498db;
                 color: white;
-                font-size: 11pt;
+                font-size: 13pt;
                 font-weight: bold;
+                min-width: 120px;
+                min-height: 40px;
             }
             QPushButton:hover {
                 background-color: #2980b9;
@@ -345,18 +353,18 @@ class LoginDialog(QDialog):
         """Setup the login dialog UI"""
         layout = QVBoxLayout()
         layout.setSpacing(20)
-        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setContentsMargins(50, 50, 50, 50)
 
         # Header with logo placeholder
         header_label = QLabel("🔧 AIT CMMS LOGIN")
-        header_font = QFont("Arial", 20, QFont.Bold)
+        header_font = QFont("Arial", 24, QFont.Bold)
         header_label.setFont(header_font)
         header_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(header_label)
 
         subtitle_label = QLabel("Computerized Maintenance Management System")
         subtitle_label.setAlignment(Qt.AlignCenter)
-        subtitle_label.setStyleSheet("color: #ecf0f1; font-size: 10pt;")
+        subtitle_label.setStyleSheet("color: #ecf0f1; font-size: 12pt;")
         layout.addWidget(subtitle_label)
 
         layout.addSpacing(20)
@@ -364,21 +372,30 @@ class LoginDialog(QDialog):
         # Form
         form_layout = QFormLayout()
         form_layout.setSpacing(15)
+        form_layout.setLabelAlignment(Qt.AlignRight)
 
+        # Username label with larger font
+        username_label = QLabel("Username:")
+        username_label.setStyleSheet("color: white; font-size: 12pt; font-weight: bold;")
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Enter username")
-        form_layout.addRow("Username:", self.username_input)
+        self.username_input.setMinimumHeight(40)
+        form_layout.addRow(username_label, self.username_input)
 
+        # Password label with larger font
+        password_label = QLabel("Password:")
+        password_label.setStyleSheet("color: white; font-size: 12pt; font-weight: bold;")
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Enter password")
         self.password_input.setEchoMode(QLineEdit.Password)
-        form_layout.addRow("Password:", self.password_input)
+        self.password_input.setMinimumHeight(40)
+        form_layout.addRow(password_label, self.password_input)
 
         layout.addLayout(form_layout)
 
         # Status label
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
+        self.status_label.setStyleSheet("color: #e74c3c; font-weight: bold; font-size: 11pt;")
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
@@ -389,7 +406,8 @@ class LoginDialog(QDialog):
 
         login_button = QPushButton("Login")
         login_button.clicked.connect(self.handle_login)
-        login_button.setMinimumWidth(120)
+        login_button.setMinimumWidth(150)
+        login_button.setMinimumHeight(45)
         button_layout.addWidget(login_button)
 
         button_layout.addStretch()
@@ -862,7 +880,7 @@ class AITCMMSSystemPyQt5(QMainWindow):
                     # Set up parts integration if available
                     if CM_PARTS_INTEGRATION_AVAILABLE:
                         try:
-                            parts_integration = CMPartsIntegration(conn, self.user_name)
+                            parts_integration = CMPartsIntegration(self)
                             self.cm_management_tab.set_parts_integration(parts_integration)
                         except Exception as e:
                             print(f"  ⚠ Parts integration setup failed: {e}")
