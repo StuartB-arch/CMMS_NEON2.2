@@ -4705,11 +4705,26 @@ class AITCMMSSystem:
         self.session_id = None  # Track user session for multi-user support
         self.user_id = None  # Database user ID
         self.root.title("AIT Complete CMMS - Computerized Maintenance Management System")
-        self.root.geometry("1800x1000")
+
+        # Get screen dimensions and set window geometry dynamically
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Set window geometry based on screen size (90% of screen)
+        window_width = int(screen_width * 0.9)
+        window_height = int(screen_height * 0.9)
+        x_position = int((screen_width - window_width) / 2)
+        y_position = int((screen_height - window_height) / 2)
+        self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+
+        # Maximize window
         try:
             self.root.state('zoomed')  # Maximize window on Windows
         except:
-            pass  # Skip if not on Windows
+            try:
+                self.root.attributes('-zoomed', True)  # Alternative for Linux
+            except:
+                pass  # Skip if platform doesn't support maximization
 
         # ===== ROLE-BASED ACCESS CONTROL =====
         self.current_user_role = None  # Will be set by login
@@ -4737,6 +4752,16 @@ class AITCMMSSystem:
         if not self.show_login_dialog():
             self.root.destroy()
             return
+
+        # Ensure window is maximized after login
+        self.root.update_idletasks()
+        try:
+            self.root.state('zoomed')
+        except:
+            try:
+                self.root.attributes('-zoomed', True)
+            except:
+                pass
 
         # ===== Initialize PostgreSQL Database =====
         self.init_database()
