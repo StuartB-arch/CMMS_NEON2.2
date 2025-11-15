@@ -415,24 +415,24 @@ class EquipmentTab(QWidget):
             cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Get total assets count
-            cursor.execute('SELECT COUNT(*) FROM equipment')
-            total_assets = cursor.fetchone()[0]
+            cursor.execute('SELECT COUNT(*) as count FROM equipment')
+            total_assets = cursor.fetchone()['count']
 
             # Get Cannot Find count from cannot_find_assets table
             cursor.execute('''
-                SELECT COUNT(DISTINCT bfm_equipment_no)
+                SELECT COUNT(DISTINCT bfm_equipment_no) as count
                 FROM cannot_find_assets
                 WHERE status = %s
             ''', ('Missing',))
-            cannot_find_count = cursor.fetchone()[0]
+            cannot_find_count = cursor.fetchone()['count']
 
             # Get Run to Failure count from equipment table
             cursor.execute('''
-                SELECT COUNT(*)
+                SELECT COUNT(*) as count
                 FROM equipment
                 WHERE status = %s
             ''', ('Run to Failure',))
-            rtf_count = cursor.fetchone()[0]
+            rtf_count = cursor.fetchone()['count']
 
             # Active assets = Total - Cannot Find - Run to Failure
             active_assets = total_assets - cannot_find_count - rtf_count

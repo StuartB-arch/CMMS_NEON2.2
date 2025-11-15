@@ -1309,7 +1309,9 @@ class AITCMMSSystemPyQt5(QMainWindow):
 
     def update_status(self, message: str):
         """Update status bar with message"""
-        self.status_message.setText(message)
+        # Guard against calls before status_message is initialized
+        if hasattr(self, 'status_message') and self.status_message:
+            self.status_message.setText(message)
         print(f"Status: {message}")
 
     def check_database_connection(self):
