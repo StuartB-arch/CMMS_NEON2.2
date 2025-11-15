@@ -46,10 +46,39 @@ except ImportError:
     REPORTLAB_AVAILABLE = False
     print("ReportLab not installed. PDF generation will not work.")
 
+# ===== WINDOWS DPI AWARENESS =====
+# This MUST be called before creating any Tkinter windows
+# to prevent scaling issues on high-DPI displays
+try:
+    import ctypes
+    # Tell Windows we are DPI aware
+    # This prevents Windows from virtualizing our application
+    # and causing scaling conflicts with Tkinter's own scaling
+    if sys.platform == 'win32':
+        try:
+            # Try Windows 10/11 method first (per-monitor DPI aware v2)
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            print("Set DPI awareness: Per-Monitor DPI Aware V2")
+        except:
+            try:
+                # Fall back to Windows 8.1 method (per-monitor DPI aware)
+                ctypes.windll.shcore.SetProcessDpiAwareness(1)
+                print("Set DPI awareness: Per-Monitor DPI Aware")
+            except:
+                try:
+                    # Fall back to Windows Vista/7 method (system DPI aware)
+                    ctypes.windll.user32.SetProcessDPIAware()
+                    print("Set DPI awareness: System DPI Aware")
+                except:
+                    print("Could not set DPI awareness")
+except Exception as e:
+    print(f"DPI awareness setup error: {e}")
+
 def get_scaling_factor():
     """
     Get appropriate UI scaling factor based on screen resolution.
-    For high-DPI displays (like 4K), we need to scale up the UI elements.
+    With Windows DPI awareness enabled, we get true screen pixels.
+    Tkinter scaling is reduced since Windows handles most DPI scaling.
     """
     try:
         import tkinter as tk
@@ -62,20 +91,21 @@ def get_scaling_factor():
 
         temp_root.destroy()
 
-        # Calculate scaling based on screen resolution
+        # With DPI awareness enabled, Windows reports true pixels
+        # We only need minimal Tkinter scaling for very high resolutions
         # Standard 1920x1080 = no scaling (1.0)
-        # 4K 3840x2160 = 2x scaling (2.0)
+        # 4K 3840x2160 = modest scaling (1.3) since Windows DPI handles most of it
         if screen_width >= 3840 or screen_height >= 2160:
-            # 4K or higher - use 2x scaling
-            scaling = 2.0
+            # 4K or higher - modest Tkinter scaling
+            scaling = 1.3
         elif screen_width >= 2560 or screen_height >= 1440:
-            # 1440p - use 1.5x scaling
-            scaling = 1.5
+            # 1440p - slight scaling
+            scaling = 1.15
         else:
-            # 1080p or lower - no scaling
+            # 1080p or lower - no additional scaling
             scaling = 1.0
 
-        print(f"Screen resolution: {screen_width}x{screen_height}, Scaling: {scaling}")
+        print(f"Screen resolution: {screen_width}x{screen_height}, Tkinter scaling: {scaling}")
         return scaling
     except Exception as e:
         print(f"Could not detect screen resolution: {e}")
@@ -6037,6 +6067,7 @@ class AITCMMSSystem:
 
         # Apply UI scaling based on screen resolution
         # This is critical for 4K displays to make text/buttons readable
+        # With DPI awareness set, this scaling will work correctly
         try:
             scaling_factor = get_scaling_factor()
             self.root.tk.call('tk', 'scaling', scaling_factor)
@@ -6044,25 +6075,23 @@ class AITCMMSSystem:
         except Exception as e:
             print(f"Could not apply scaling: {e}")
 
-        # Get screen dimensions and set window geometry dynamically
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
+        # Set a reasonable minimum window size
+        # Don't set specific geometry - let maximize handle it
+        self.root.minsize(1200, 800)
 
-        # Set window geometry based on screen size (90% of screen)
-        window_width = int(screen_width * 0.9)
-        window_height = int(screen_height * 0.9)
-        x_position = int((screen_width - window_width) / 2)
-        y_position = int((screen_height - window_height) / 2)
-        self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
-
-        # Maximize window
+        # Maximize window immediately
+        # This works best with DPI awareness enabled
         try:
             self.root.state('zoomed')  # Maximize window on Windows
+            print("Window maximized (Windows)")
         except:
             try:
                 self.root.attributes('-zoomed', True)  # Alternative for Linux
+                print("Window maximized (Linux)")
             except:
-                pass  # Skip if platform doesn't support maximization
+                # If maximization fails, set a large default geometry
+                self.root.geometry("1600x900")
+                print("Window geometry set to default")
 
         # ===== ROLE-BASED ACCESS CONTROL =====
         self.current_user_role = None  # Will be set by login
