@@ -131,6 +131,12 @@ class PMSchedulingTab(QWidget):
         btn_export.clicked.connect(self.export_weekly_schedule)
         layout.addWidget(btn_export)
 
+        # Monthly Summary Report button
+        btn_monthly_report = QPushButton("Monthly Summary Report")
+        btn_monthly_report.clicked.connect(self.generate_monthly_summary_report)
+        btn_monthly_report.setStyleSheet("QPushButton { background-color: #FF9800; color: white; }")
+        layout.addWidget(btn_monthly_report)
+
         layout.addStretch()
 
         group.setLayout(layout)
@@ -233,6 +239,11 @@ class PMSchedulingTab(QWidget):
 
         except Exception as e:
             print(f"Error populating week selector: {e}")
+            # Rollback failed transaction
+            try:
+                self.conn.rollback()
+            except:
+                pass
             QMessageBox.warning(self, "Warning", f"Error populating week selector: {str(e)}")
 
     def populate_technician_exclusion_list(self):
@@ -280,6 +291,11 @@ class PMSchedulingTab(QWidget):
 
         except Exception as e:
             print(f"Error loading latest weekly schedule: {e}")
+            # Rollback failed transaction
+            try:
+                self.conn.rollback()
+            except:
+                pass
 
     def generate_weekly_assignments(self):
         """
@@ -431,7 +447,12 @@ class PMSchedulingTab(QWidget):
                 # Populate table
                 table.setRowCount(len(assignments))
                 for row_idx, assignment in enumerate(assignments):
-                    bfm_no, description, pm_type, scheduled_date, status = assignment
+                    # assignment is now a dictionary from RealDictCursor
+                    bfm_no = assignment['bfm_equipment_no']
+                    description = assignment['description']
+                    pm_type = assignment['pm_type']
+                    scheduled_date = assignment['scheduled_date']
+                    status = assignment['status']
 
                     # Create table items
                     table.setItem(row_idx, 0, QTableWidgetItem(str(bfm_no or '')))
@@ -442,6 +463,11 @@ class PMSchedulingTab(QWidget):
 
             except Exception as e:
                 print(f"Error loading schedule for {technician}: {e}")
+                # Rollback failed transaction
+                try:
+                    self.conn.rollback()
+                except:
+                    pass
 
             table.setSortingEnabled(True)
 
@@ -538,24 +564,21 @@ class PMSchedulingTab(QWidget):
             for i, assignment in enumerate(assignments):
                 print(f"DEBUG: Processing assignment {i}: {assignment}")
 
-                # Safety check for assignment data
-                if not assignment or len(assignment) < 8:
+                # Safety check for assignment data - now a dictionary from RealDictCursor
+                if not assignment:
                     print(f"DEBUG: Skipping invalid assignment {i}")
                     continue
 
-                # Extract variables from assignment
-                bfm_no, sap_no, description, tool_id, location, master_lin, pm_type, scheduled_date, assigned_tech = assignment
-
-                # Add None checks for all variables
-                bfm_no = bfm_no or ''
-                sap_no = sap_no or ''
-                description = description or ''
-                tool_id = tool_id or ''
-                location = location or ''
-                master_lin = master_lin or ''
-                pm_type = pm_type or 'Monthly'
-                scheduled_date = scheduled_date or ''
-                assigned_tech = assigned_tech or technician
+                # Extract variables from assignment dictionary
+                bfm_no = assignment.get('bfm_equipment_no') or ''
+                sap_no = assignment.get('sap_material_no') or ''
+                description = assignment.get('description') or ''
+                tool_id = assignment.get('tool_id_drawing_no') or ''
+                location = assignment.get('location') or ''
+                master_lin = assignment.get('master_lin') or ''
+                pm_type = assignment.get('pm_type') or 'Monthly'
+                scheduled_date = assignment.get('scheduled_date') or ''
+                assigned_tech = assignment.get('assigned_technician') or technician
 
                 print(f"DEBUG: Processing {bfm_no} - {pm_type}")
 
@@ -913,6 +936,220 @@ class PMSchedulingTab(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to export weekly schedule: {str(e)}")
+            traceback.print_exc()
+
+    def generate_monthly_summary_report(self):
+        """Generate and export monthly PM summary report to PDF"""
+        try:
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton
+            from PyQt5.QtCore import Qt
+            from datetime import datetime
+
+            # Create date selection dialog
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Monthly PM Summary Report")
+            dialog.setGeometry(100, 100, 400, 150)
+
+            layout = QVBoxLayout()
+
+            # Month selection
+            month_layout = QHBoxLayout()
+            month_layout.addWidget(QLabel("Select Month:"))
+            month_combo = QComboBox()
+            months = ['January', 'February', 'March', 'April', 'May', 'June',
+                     'July', 'August', 'September', 'October', 'November', 'December']
+            month_combo.addItems(months)
+            current_month = datetime.now().month - 1
+            month_combo.setCurrentIndex(current_month)
+            month_layout.addWidget(month_combo)
+            layout.addLayout(month_layout)
+
+            # Year selection
+            year_layout = QHBoxLayout()
+            year_layout.addWidget(QLabel("Select Year:"))
+            year_combo = QComboBox()
+            current_year = datetime.now().year
+            for year in range(current_year - 2, current_year + 1):
+                year_combo.addItem(str(year))
+            year_combo.setCurrentIndex(2)  # Current year
+            year_layout.addWidget(year_combo)
+            layout.addLayout(year_layout)
+
+            # Buttons
+            button_layout = QHBoxLayout()
+
+            ok_button = QPushButton("Generate PDF")
+            ok_button.clicked.connect(dialog.accept)
+            button_layout.addWidget(ok_button)
+
+            cancel_button = QPushButton("Cancel")
+            cancel_button.clicked.connect(dialog.reject)
+            button_layout.addWidget(cancel_button)
+
+            layout.addLayout(button_layout)
+            layout.addStretch()
+
+            dialog.setLayout(layout)
+
+            if dialog.exec_() == QDialog.Accepted:
+                selected_month = month_combo.currentIndex() + 1
+                selected_year = int(year_combo.currentText())
+                self.export_monthly_summary_pdf(selected_month, selected_year)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to generate report: {str(e)}")
+            traceback.print_exc()
+
+    def export_monthly_summary_pdf(self, month: int, year: int):
+        """Generate and export monthly PM summary as PDF"""
+        try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+            from datetime import datetime, timedelta
+            import calendar
+
+            # Create filename
+            month_name = calendar.month_name[month]
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            default_filename = f"Monthly_PM_Summary_{month_name}_{year}_{timestamp}.pdf"
+
+            # Open file dialog
+            filename, _ = QFileDialog.getSaveFileName(
+                self,
+                "Export Monthly Summary",
+                default_filename,
+                "PDF Files (*.pdf);;All Files (*)"
+            )
+
+            if not filename:
+                return
+
+            # Create PDF document
+            doc = SimpleDocTemplate(filename, pagesize=letter,
+                                  rightMargin=36, leftMargin=36,
+                                  topMargin=36, bottomMargin=36)
+
+            styles = getSampleStyleSheet()
+            story = []
+
+            # Title
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                textColor=colors.HexColor('#1a1a1a'),
+                spaceAfter=30,
+                alignment=1  # Center
+            )
+            story.append(Paragraph(f"Monthly PM Summary Report", title_style))
+            story.append(Paragraph(f"{month_name} {year}", styles['Heading2']))
+            story.append(Spacer(1, 0.3*inch))
+
+            # Get monthly data
+            cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
+
+            # PM completions for the month
+            start_date = f"{year}-{month:02d}-01"
+            last_day = calendar.monthrange(year, month)[1]
+            end_date = f"{year}-{month:02d}-{last_day}"
+
+            cursor.execute('''
+                SELECT pm_type, COUNT(*) as count, SUM(labor_hours) as total_hours
+                FROM pm_completions
+                WHERE completion_date BETWEEN %s AND %s
+                GROUP BY pm_type
+                ORDER BY pm_type
+            ''', (start_date, end_date))
+
+            pm_data = cursor.fetchall()
+
+            # Summary section
+            story.append(Paragraph("PM Completions Summary", styles['Heading2']))
+
+            if pm_data:
+                summary_table_data = [['PM Type', 'Count', 'Total Hours']]
+                total_pms = 0
+                total_hours = 0
+
+                for row in pm_data:
+                    pm_type = row['pm_type'] or 'Unknown'
+                    count = row['count'] or 0
+                    hours = row['total_hours'] or 0
+                    total_pms += count
+                    total_hours += hours
+                    summary_table_data.append([pm_type, str(count), f"{hours:.1f}"])
+
+                summary_table_data.append(['TOTAL', str(total_pms), f"{total_hours:.1f}"])
+
+                summary_table = Table(summary_table_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
+                summary_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E8F5E9')),
+                    ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                story.append(summary_table)
+            else:
+                story.append(Paragraph("No PM completions recorded for this month.", styles['Normal']))
+
+            story.append(Spacer(1, 0.3*inch))
+
+            # Technician summary
+            cursor.execute('''
+                SELECT technician_name, COUNT(*) as count, SUM(labor_hours) as total_hours
+                FROM pm_completions
+                WHERE completion_date BETWEEN %s AND %s
+                GROUP BY technician_name
+                ORDER BY count DESC
+            ''', (start_date, end_date))
+
+            tech_data = cursor.fetchall()
+
+            story.append(Paragraph("Technician Performance", styles['Heading2']))
+
+            if tech_data:
+                tech_table_data = [['Technician', 'PMs Completed', 'Total Hours']]
+
+                for row in tech_data:
+                    tech_name = row['technician_name'] or 'Unknown'
+                    count = row['count'] or 0
+                    hours = row['total_hours'] or 0
+                    tech_table_data.append([tech_name, str(count), f"{hours:.1f}"])
+
+                tech_table = Table(tech_table_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
+                tech_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2196F3')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                story.append(tech_table)
+            else:
+                story.append(Paragraph("No technician data available.", styles['Normal']))
+
+            # Build and save PDF
+            doc.build(story)
+
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Monthly report generated successfully!\n\nSaved to:\n{filename}"
+            )
+            self.status_updated.emit(f"Monthly summary report generated: {filename}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to export PDF: {str(e)}")
             traceback.print_exc()
 
     def update_status(self, message):
