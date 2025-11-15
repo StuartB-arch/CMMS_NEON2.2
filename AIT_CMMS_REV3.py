@@ -34,6 +34,8 @@ from typing import List, Dict, Optional, Tuple, NamedTuple
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+import sys
+import platform
 try:
     from reportlab.lib.pagesizes import letter
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
@@ -44,6 +46,72 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
     print("ReportLab not installed. PDF generation will not work.")
+
+# ===== DPI AWARENESS CONFIGURATION =====
+def setup_dpi_awareness():
+    """
+    Configure Windows DPI awareness and calculate appropriate scaling factor.
+    This ensures the application displays correctly on high-DPI displays and
+    adapts to different monitor configurations.
+
+    Returns:
+        float: The calculated scaling factor (1.0 = 100%, 1.5 = 150%, etc.)
+    """
+    try:
+        # For Windows, set process DPI awareness
+        if platform.system() == 'Windows':
+            try:
+                import ctypes
+                # Try to set DPI awareness (Windows 8.1+)
+                # This tells Windows that the app will handle DPI scaling itself
+                try:
+                    # Windows 10 version 1607+ - Per Monitor V2 DPI awareness
+                    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+                except:
+                    try:
+                        # Windows 8.1+ - Per Monitor DPI awareness
+                        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+                    except:
+                        # Fallback to basic DPI awareness (Windows Vista+)
+                        ctypes.windll.user32.SetProcessDPIAware()
+
+                # Get the actual DPI of the primary monitor
+                try:
+                    hdc = ctypes.windll.user32.GetDC(0)
+                    dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX = 88
+                    ctypes.windll.user32.ReleaseDC(0, hdc)
+
+                    # Calculate scaling factor based on DPI
+                    # Standard DPI is 96, so scaling = actual_dpi / 96
+                    # However, for Tkinter we want a more conservative scaling
+                    # to avoid making things too large
+                    if dpi <= 96:
+                        # Standard DPI (1920x1080 or lower) - no scaling needed
+                        return 1.0
+                    elif dpi <= 120:
+                        # 125% Windows scaling (1920x1080 with scaling)
+                        return 1.1
+                    elif dpi <= 144:
+                        # 150% Windows scaling (typically 1440p or 4K with scaling)
+                        return 1.2
+                    elif dpi <= 192:
+                        # 200% Windows scaling (4K displays)
+                        return 1.3
+                    else:
+                        # Very high DPI (5K+ displays)
+                        return 1.4
+                except:
+                    # If we can't get DPI, use a safe default
+                    return 1.2
+            except Exception as e:
+                print(f"Could not set Windows DPI awareness: {e}")
+                return 1.2
+        else:
+            # For Linux/Mac, use a moderate default scaling
+            return 1.1
+    except Exception as e:
+        print(f"DPI awareness setup error: {e}")
+        return 1.0  # Safe fallback - no scaling
 
 class PMType(Enum):
     MONTHLY = "Monthly"
@@ -5982,8 +6050,10 @@ class AITCMMSSystem:
         """Get current date in standard format"""
         return datetime.now().strftime('%Y-%m-%d')
     
-    def __init__(self, root):
+    def __init__(self, root, scaling_factor=1.0):
         self.root = root
+        self.scaling_factor = scaling_factor  # Store for use throughout the app
+
         # === NEON CLOUD DATABASE CONFIGURATION ===
         self.DB_CONFIG = {
             'host': 'ep-tiny-paper-ad8glt26-pooler.c-2.us-east-1.aws.neon.tech',
@@ -5999,14 +6069,15 @@ class AITCMMSSystem:
         self.user_id = None  # Database user ID
         self.root.title("AIT Complete CMMS - Computerized Maintenance Management System")
 
-        # ===== UI SCALING FOR BETTER READABILITY =====
-        # Increase UI scaling to make text and widgets larger
-        # This helps on high-DPI displays and makes the app more readable
+        # ===== DYNAMIC UI SCALING FOR MULTI-MONITOR SUPPORT =====
+        # Apply DPI-aware scaling that adapts to different monitors
+        # This ensures consistent display across high-DPI laptop screens and standard monitors
         try:
-            # Scale up all UI elements by 50% for better readability
-            self.root.tk.call('tk', 'scaling', 2.0)
-        except:
-            pass
+            # Use dynamically calculated scaling factor based on monitor DPI
+            self.root.tk.call('tk', 'scaling', self.scaling_factor)
+            print(f"Applied Tkinter scaling: {self.scaling_factor}")
+        except Exception as e:
+            print(f"Could not apply Tkinter scaling: {e}")
 
         # Get screen dimensions and make window fullscreen
         screen_width = self.root.winfo_screenwidth()
@@ -6917,8 +6988,19 @@ class AITCMMSSystem:
         try:
             # Import PyQt5 modules needed for the KPI UI
             from PyQt5.QtWidgets import QApplication, QWidget
+            from PyQt5.QtCore import Qt
             from kpi_ui import KPIDashboard
             import sys
+
+            # Enable High DPI scaling for PyQt5 BEFORE creating QApplication
+            # This must be set before QApplication is instantiated
+            try:
+                # Enable high DPI scaling (Qt 5.6+)
+                QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+                # Use high DPI pixmaps (Qt 5.7+)
+                QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+            except:
+                pass  # Older Qt versions may not support these attributes
 
             # Check if QApplication instance exists
             app = QApplication.instance()
@@ -18864,6 +18946,11 @@ class AITCMMSSystem:
 
 # Main application startup
 if __name__ == "__main__":
+    # Setup DPI awareness BEFORE creating Tk window
+    # This must be done before any GUI elements are created
+    scaling_factor = setup_dpi_awareness()
+    print(f"DPI scaling factor: {scaling_factor}")
+
     root = tk.Tk()
-    app = AITCMMSSystem(root)
+    app = AITCMMSSystem(root, scaling_factor=scaling_factor)
     root.mainloop()
