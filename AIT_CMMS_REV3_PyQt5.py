@@ -283,7 +283,7 @@ class LoginDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("AIT CMMS - User Login")
-        self.setFixedSize(550, 400)  # Increased size for better readability
+        self.setFixedSize(550, 550)  # Significantly increased height for better visibility
         self.setModal(True)
 
         # Center the dialog
@@ -662,7 +662,7 @@ class AITCMMSSystemPyQt5(QMainWindow):
                     WHERE role = 'Technician' AND is_active = TRUE
                     ORDER BY full_name
                 """)
-                self.technicians = [row[0] for row in cursor.fetchall()]
+                self.technicians = [row['full_name'] for row in cursor.fetchall()]
 
             if not self.technicians:
                 # Fallback list if no technicians in database

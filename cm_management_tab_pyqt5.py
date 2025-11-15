@@ -686,7 +686,7 @@ class CreateCMDialog(QDialog):
                 "WHERE status = 'Active' ORDER BY bfm_equipment_no"
             )
 
-            equipment_list = [row[0] for row in cursor.fetchall()]
+            equipment_list = [row['bfm_equipment_no'] for row in cursor.fetchall()]
             self.equipment_combo.addItems(equipment_list)
             cursor.close()
 
@@ -955,7 +955,7 @@ class EditCMDialog(QDialog):
         try:
             cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('SELECT bfm_equipment_no FROM equipment ORDER BY bfm_equipment_no')
-            equipment_list = [row[0] for row in cursor.fetchall()]
+            equipment_list = [row['bfm_equipment_no'] for row in cursor.fetchall()]
             self.equipment_combo.addItems(equipment_list)
             cursor.close()
         except Exception as e:
@@ -1420,7 +1420,7 @@ class CreateMissingPartsDialog(QDialog):
                 "WHERE status = 'Active' ORDER BY bfm_equipment_no"
             )
 
-            equipment_list = [row[0] for row in cursor.fetchall()]
+            equipment_list = [row['bfm_equipment_no'] for row in cursor.fetchall()]
             self.equipment_combo.addItems(equipment_list)
             cursor.close()
 
@@ -1635,7 +1635,7 @@ class EditMissingPartsDialog(QDialog):
         try:
             cursor = self.conn.cursor(cursor_factory=extras.RealDictCursor)
             cursor.execute('SELECT bfm_equipment_no FROM equipment ORDER BY bfm_equipment_no')
-            equipment_list = [row[0] for row in cursor.fetchall()]
+            equipment_list = [row['bfm_equipment_no'] for row in cursor.fetchall()]
             self.equipment_combo.addItems(equipment_list)
             cursor.close()
         except Exception as e:

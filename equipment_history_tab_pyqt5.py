@@ -598,9 +598,9 @@ class EquipmentHistoryTab(QWidget):
             self.equipment_list = []
 
             for row in cursor.fetchall():
-                bfm_no = row[0]
-                description = row[1] or "No description"
-                status = row[2] or "Unknown"
+                bfm_no = row['bfm_equipment_no']
+                description = row['short_description'] or "No description"
+                status = row['status'] or "Unknown"
                 display_text = f"{bfm_no} - {description} ({status})"
                 self.equipment_combo.addItem(display_text, bfm_no)
                 self.equipment_list.append((bfm_no, description, status))
@@ -705,19 +705,19 @@ class EquipmentHistoryTab(QWidget):
         results = []
         for row in cursor.fetchall():
             results.append({
-                'date': row[0],
+                'date': row['completion_date'],
                 'event_type': 'PM',
-                'pm_type': row[1],
-                'technician': row[2],
-                'labor_hours': row[3] or 0,
-                'notes': row[4] or '',
-                'special_equipment': row[5] or '',
-                'description': f"{row[1]} PM Completion",
+                'pm_type': row['pm_type'],
+                'technician': row['technician_name'],
+                'labor_hours': row['labor_hours'] or 0,
+                'notes': row['notes'] or '',
+                'special_equipment': row['special_equipment'] or '',
+                'description': f"{row['pm_type']} PM Completion",
                 'status': 'Completed',
                 'color': '#4CAF50',  # Green
                 'category': 'Preventive Maintenance',
-                'title': f"{row[1]} PM",
-                'details': f"Technician: {row[2]}, Hours: {row[3] or 0}"
+                'title': f"{row['pm_type']} PM",
+                'details': f"Technician: {row['technician_name']}, Hours: {row['labor_hours'] or 0}"
             })
 
         return results
@@ -742,7 +742,7 @@ class EquipmentHistoryTab(QWidget):
         results = []
         for row in cursor.fetchall():
             # Determine color based on status
-            status = row[5] or 'Unknown'
+            status = row['status'] or 'Unknown'
             if status == 'Closed':
                 color = '#4CAF50'  # Green
             elif status == 'In Progress':
@@ -751,23 +751,23 @@ class EquipmentHistoryTab(QWidget):
                 color = '#F44336'  # Red
 
             results.append({
-                'date': row[1],  # reported_date
+                'date': row['reported_date'],
                 'event_type': 'CM',
-                'cm_number': row[0],
-                'date_opened': row[1],
-                'date_closed': row[2],
-                'description': row[3] or 'No description',
-                'priority': row[4] or 'Normal',
+                'cm_number': row['cm_number'],
+                'date_opened': row['reported_date'],
+                'date_closed': row['closed_date'],
+                'description': row['description'] or 'No description',
+                'priority': row['priority'] or 'Normal',
                 'status': status,
-                'technician': row[6] or 'Unassigned',
-                'labor_hours': row[7] or 0,
-                'notes': row[8] or '',
-                'root_cause': row[9] or '',
-                'corrective_action': row[10] or '',
+                'technician': row['assigned_technician'] or 'Unassigned',
+                'labor_hours': row['labor_hours'] or 0,
+                'notes': row['notes'] or '',
+                'root_cause': row['root_cause'] or '',
+                'corrective_action': row['corrective_action'] or '',
                 'color': color,
                 'category': 'Corrective Maintenance',
-                'title': f"CM {row[0]}",
-                'details': f"Priority: {row[4] or 'Normal'}, Status: {status}"
+                'title': f"CM {row['cm_number']}",
+                'details': f"Priority: {row['priority'] or 'Normal'}, Status: {status}"
             })
 
         return results
