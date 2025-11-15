@@ -243,21 +243,21 @@ class EquipmentTab(QWidget):
 
             # Add equipment to table
             for equipment in self.equipment_data:
-                if len(equipment) >= 9:
+                if equipment:  # Check if equipment dict is not empty
                     row_position = self.equipment_table.rowCount()
                     self.equipment_table.insertRow(row_position)
 
-                    # Create items for each column
+                    # Create items for each column (now using dictionary keys)
                     items = [
-                        equipment[1] or '',  # SAP
-                        equipment[2] or '',  # BFM
-                        equipment[3] or '',  # Description
-                        equipment[5] or '',  # Location
-                        equipment[6] or '',  # Master LIN
-                        'Yes' if equipment[7] else 'No',  # Monthly PM
-                        'Yes' if equipment[8] else 'No',  # Six Month PM
-                        'Yes' if equipment[9] else 'No',  # Annual PM
-                        equipment[16] or 'Active'  # Status
+                        equipment.get('sap_material_no') or '',  # SAP
+                        equipment.get('bfm_equipment_no') or '',  # BFM
+                        equipment.get('description') or '',  # Description
+                        equipment.get('location') or '',  # Location
+                        equipment.get('master_lin') or '',  # Master LIN
+                        'Yes' if equipment.get('monthly_pm') else 'No',  # Monthly PM
+                        'Yes' if equipment.get('six_month_pm') else 'No',  # Six Month PM
+                        'Yes' if equipment.get('annual_pm') else 'No',  # Annual PM
+                        equipment.get('status') or 'Active'  # Status
                     ]
 
                     for col, item_text in enumerate(items):
@@ -306,8 +306,8 @@ class EquipmentTab(QWidget):
             matches_found = 0
 
             for equipment in self.equipment_data:
-                if len(equipment) >= 9:
-                    equipment_location = equipment[5] or ''
+                if equipment:  # Check if equipment dict is not empty
+                    equipment_location = equipment.get('location') or ''
 
                     # Check location filter
                     location_match = (selected_location == "All Locations" or
@@ -318,28 +318,28 @@ class EquipmentTab(QWidget):
 
                     # Check if search term matches any field
                     searchable_fields = [
-                        equipment[1] or '',  # SAP
-                        equipment[2] or '',  # BFM
-                        equipment[3] or '',  # Description
+                        equipment.get('sap_material_no') or '',  # SAP
+                        equipment.get('bfm_equipment_no') or '',  # BFM
+                        equipment.get('description') or '',  # Description
                         equipment_location,  # Location
-                        equipment[6] or ''   # Master LIN
+                        equipment.get('master_lin') or ''   # Master LIN
                     ]
 
                     if not search_term or any(search_term in field.lower() for field in searchable_fields):
                         row_position = self.equipment_table.rowCount()
                         self.equipment_table.insertRow(row_position)
 
-                        # Create items for each column
+                        # Create items for each column (now using dictionary keys)
                         items = [
-                            equipment[1] or '',  # SAP
-                            equipment[2] or '',  # BFM
-                            equipment[3] or '',  # Description
+                            equipment.get('sap_material_no') or '',  # SAP
+                            equipment.get('bfm_equipment_no') or '',  # BFM
+                            equipment.get('description') or '',  # Description
                             equipment_location,  # Location
-                            equipment[6] or '',  # Master LIN
-                            'Yes' if equipment[7] else 'No',  # Monthly PM
-                            'Yes' if equipment[8] else 'No',  # Six Month PM
-                            'Yes' if equipment[9] else 'No',  # Annual PM
-                            equipment[16] or 'Active'  # Status
+                            equipment.get('master_lin') or '',  # Master LIN
+                            'Yes' if equipment.get('monthly_pm') else 'No',  # Monthly PM
+                            'Yes' if equipment.get('six_month_pm') else 'No',  # Six Month PM
+                            'Yes' if equipment.get('annual_pm') else 'No',  # Annual PM
+                            equipment.get('status') or 'Active'  # Status
                         ]
 
                         for col, item_text in enumerate(items):

@@ -65,6 +65,10 @@ class PMSchedulingTab(QWidget):
         self.technicians = technicians
         self.weekly_pm_target = 130  # Target number of PMs per week
 
+        # Initialize technician_tables early to prevent AttributeError
+        self.technician_tables = {}
+        self.technician_tabs = None
+
         # Calculate current week start (Monday)
         today = datetime.now()
         self.current_week_start = today - timedelta(days=today.weekday())
@@ -400,6 +404,10 @@ class PMSchedulingTab(QWidget):
         week_start = self.week_combo.currentText()
 
         if not week_start:
+            return
+
+        # Guard against missing technician_tables during initialization
+        if not self.technician_tables:
             return
 
         for technician, table in self.technician_tables.items():
