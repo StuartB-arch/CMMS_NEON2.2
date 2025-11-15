@@ -6807,9 +6807,9 @@ class AITCMMSSystem:
         list_frame.pack(fill='both', expand=True, padx=10, pady=5)
         
         # Treeview with scrollbars
-        self.equipment_tree = ttk.Treeview(list_frame, 
+        self.equipment_tree = ttk.Treeview(list_frame,
                                          columns=('SAP', 'BFM', 'Description', 'Location', 'LIN', 'Monthly', 'Six Month', 'Annual', 'Status'),
-                                         show='headings', height=20)
+                                         show='headings')
         self.equipment_tree.configure(selectmode='extended')  # Enable multi-select
         # Configure columns
         columns_config = {
