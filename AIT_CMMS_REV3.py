@@ -6044,11 +6044,25 @@ class AITCMMSSystem:
         except Exception as e:
             print(f"Could not apply scaling: {e}")
 
-        self.root.geometry("1800x1000")
+        # Get screen dimensions and set window geometry dynamically
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Set window geometry based on screen size (90% of screen)
+        window_width = int(screen_width * 0.9)
+        window_height = int(screen_height * 0.9)
+        x_position = int((screen_width - window_width) / 2)
+        y_position = int((screen_height - window_height) / 2)
+        self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+
+        # Maximize window
         try:
             self.root.state('zoomed')  # Maximize window on Windows
         except:
-            pass  # Skip if not on Windows
+            try:
+                self.root.attributes('-zoomed', True)  # Alternative for Linux
+            except:
+                pass  # Skip if platform doesn't support maximization
 
         # ===== ROLE-BASED ACCESS CONTROL =====
         self.current_user_role = None  # Will be set by login
@@ -6082,6 +6096,16 @@ class AITCMMSSystem:
         if not self.show_login_dialog():
             self.root.destroy()
             return
+
+        # Ensure window is maximized after login
+        self.root.update_idletasks()
+        try:
+            self.root.state('zoomed')
+        except:
+            try:
+                self.root.attributes('-zoomed', True)
+            except:
+                pass
 
         # Load technicians list from database (after successful login)
         self.load_technicians_from_database()
@@ -9476,9 +9500,9 @@ class AITCMMSSystem:
         list_frame.pack(fill='both', expand=True, padx=10, pady=5)
         
         # Treeview with scrollbars
-        self.equipment_tree = ttk.Treeview(list_frame, 
+        self.equipment_tree = ttk.Treeview(list_frame,
                                          columns=('SAP', 'BFM', 'Description', 'Location', 'LIN', 'Monthly', 'Six Month', 'Annual', 'Status'),
-                                         show='headings', height=20)
+                                         show='headings')
         self.equipment_tree.configure(selectmode='extended')  # Enable multi-select
         # Configure columns
         columns_config = {
