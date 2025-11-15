@@ -25,6 +25,7 @@ Database Tables:
 - cm_parts_used: Parts used in corrective maintenance
 """
 
+from psycopg2 import extras
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QLineEdit, QComboBox, QDialog, QFormLayout,
