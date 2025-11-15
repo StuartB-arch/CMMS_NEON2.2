@@ -412,16 +412,16 @@ class LoginDialog(QDialog):
 
         try:
             with db_pool.get_cursor() as cursor:
-                # Authenticate user
-                user_data = UserManager.authenticate_user(cursor, username, password)
+                # Authenticate user - use correct method name
+                user_data = UserManager.authenticate(cursor, username, password)
 
                 if user_data:
-                    self.user_id = user_data['user_id']
-                    self.user_name = user_data['user_name']
+                    self.user_id = user_data['id']  # Correct field name
+                    self.user_name = user_data['username']  # Correct field name
                     self.user_role = user_data['role']
 
-                    # Start session
-                    self.session_id = UserManager.start_session(cursor, self.user_id)
+                    # Create session - use correct method name
+                    self.session_id = UserManager.create_session(cursor, self.user_id, username)
 
                     print(f"Login successful: {self.user_name} ({self.user_role})")
                     self.accept()
@@ -569,25 +569,29 @@ class AITCMMSSystemPyQt5(QMainWindow):
             return False
 
     def init_users_table_before_login(self) -> bool:
-        """Initialize users table and run KPI migrations before login"""
+        """Initialize KPI tables and verify database connectivity before login"""
         try:
+            # Verify database connectivity
             with db_pool.get_cursor() as cursor:
-                # Initialize user management tables
-                UserManager.initialize_tables(cursor)
+                cursor.execute("SELECT 1")  # Simple connectivity test
+                print("✓ Database connection successful")
 
                 # Run KPI database migrations
                 print("Running KPI database migrations...")
                 migrate_kpi_database(db_pool)
 
-            print("Database tables initialized successfully")
+            print("Database initialization successful")
             return True
         except Exception as e:
             QMessageBox.critical(
                 self, "Database Error",
-                f"Failed to initialize database tables:\n{str(e)}\n\n"
-                f"Please check your database configuration."
+                f"Failed to initialize database:\n{str(e)}\n\n"
+                f"Please check your database configuration and ensure:\n"
+                f"1. Database is accessible\n"
+                f"2. Users table exists\n"
+                f"3. Neon database credentials are correct"
             )
-            print(f"Table initialization error: {e}")
+            print(f"Database initialization error: {e}")
             traceback.print_exc()
             return False
 
@@ -1096,10 +1100,10 @@ class AITCMMSSystemPyQt5(QMainWindow):
     def auto_save_session(self):
         """Auto-save session data"""
         try:
-            # Update session heartbeat
+            # Update session activity heartbeat
             if self.session_id:
                 with db_pool.get_cursor() as cursor:
-                    UserManager.update_session_heartbeat(cursor, self.session_id)
+                    UserManager.update_session_activity(cursor, self.session_id)
         except Exception as e:
             print(f"Auto-save error: {e}")
 
