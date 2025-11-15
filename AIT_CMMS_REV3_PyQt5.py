@@ -576,9 +576,9 @@ class AITCMMSSystemPyQt5(QMainWindow):
                 cursor.execute("SELECT 1")  # Simple connectivity test
                 print("✓ Database connection successful")
 
-                # Run KPI database migrations
+                # Run KPI database migrations (function takes no arguments)
                 print("Running KPI database migrations...")
-                migrate_kpi_database(db_pool)
+                migrate_kpi_database()  # Call without arguments
 
             print("Database initialization successful")
             return True
