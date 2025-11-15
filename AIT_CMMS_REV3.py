@@ -92,18 +92,17 @@ def get_scaling_factor():
         temp_root.destroy()
 
         # With DPI awareness enabled, Windows reports true pixels
-        # We only need minimal Tkinter scaling for very high resolutions
-        # Standard 1920x1080 = no scaling (1.0)
-        # 4K 3840x2160 = modest scaling (1.3) since Windows DPI handles most of it
+        # Aggressive scaling to ensure text is readable at all resolutions
+        # User feedback: text was too small with previous conservative scaling
         if screen_width >= 3840 or screen_height >= 2160:
-            # 4K or higher - modest Tkinter scaling
-            scaling = 1.3
+            # 4K or higher - strong scaling for readability
+            scaling = 2.2
         elif screen_width >= 2560 or screen_height >= 1440:
-            # 1440p - slight scaling
-            scaling = 1.15
+            # 1440p - substantial scaling
+            scaling = 1.9
         else:
-            # 1080p or lower - no additional scaling
-            scaling = 1.0
+            # 1080p or lower - moderate scaling to ensure readability
+            scaling = 1.6
 
         print(f"Screen resolution: {screen_width}x{screen_height}, Tkinter scaling: {scaling}")
         return scaling
@@ -4014,14 +4013,15 @@ class AITCMMSSystem:
         self.style.configure("Treeview",
                         background="#ffffff",        # White background
                         foreground="#1e3a8a",       # Dark blue text
-                        rowheight=40,                # Increased from 25 for better readability
-                        fieldbackground="#ffffff")   # White field background
+                        rowheight=45,                # Increased for better readability
+                        fieldbackground="#ffffff",   # White field background
+                        font=('TkDefaultFont', 12))  # Increased row font size
 
         # Treeview headers - increased font size
         self.style.configure("Treeview.Heading",
                         background="#3b82f6",       # Blue headers
                         foreground="white",
-                        font=('TkDefaultFont', 14, 'bold'))  # Increased from 9
+                        font=('TkDefaultFont', 16, 'bold'))  # Increased for better readability
 
         # Buttons - increased font size
         self.style.configure("TButton",
@@ -4029,7 +4029,7 @@ class AITCMMSSystem:
                         foreground="white",
                         padding=(15, 8),             # Increased padding for larger buttons
                         relief="flat",
-                        font=('TkDefaultFont', 13))  # Increased from 9
+                        font=('TkDefaultFont', 15))  # Increased for better readability
 
         # Button hover effects
         self.style.map("TButton",
@@ -4046,7 +4046,7 @@ class AITCMMSSystem:
         self.style.configure("TLabelframe.Label",
                         background="#e8f4f8",
                         foreground="#1e3a8a",
-                        font=('TkDefaultFont', 14, 'bold'))  # Increased from 10
+                        font=('TkDefaultFont', 16, 'bold'))  # Increased for better readability
     
         # Frames
         self.style.configure("TFrame",
@@ -6074,6 +6074,19 @@ class AITCMMSSystem:
             print(f"Applied Tkinter scaling: {scaling_factor}")
         except Exception as e:
             print(f"Could not apply scaling: {e}")
+
+        # Set default font sizes for all widgets to improve readability
+        try:
+            import tkinter.font as tkfont
+            default_font = tkfont.nametofont("TkDefaultFont")
+            default_font.configure(size=12)  # Increase default font size
+            text_font = tkfont.nametofont("TkTextFont")
+            text_font.configure(size=12)
+            fixed_font = tkfont.nametofont("TkFixedFont")
+            fixed_font.configure(size=11)
+            print("Increased default font sizes for better readability")
+        except Exception as e:
+            print(f"Could not set default fonts: {e}")
 
         # Set a reasonable minimum window size
         # Don't set specific geometry - let maximize handle it
