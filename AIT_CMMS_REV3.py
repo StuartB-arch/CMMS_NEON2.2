@@ -8944,15 +8944,23 @@ class AITCMMSSystem:
         # Create frame inside canvas to hold the notebook
         self.scrollable_frame = ttk.Frame(self.main_canvas)
 
-        # Configure scrolling
+        # Configure scrolling - update scroll region when content changes
         self.scrollable_frame.bind(
             "<Configure>",
             lambda e: self.main_canvas.configure(scrollregion=self.main_canvas.bbox("all"))
         )
 
         # Create window in canvas for the scrollable frame
-        self.main_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas_window = self.main_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.main_canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Make the scrollable frame fill the canvas width
+        def _configure_canvas(event):
+            # Set the width of the canvas window to match the canvas width
+            canvas_width = event.width
+            self.main_canvas.itemconfig(self.canvas_window, width=canvas_width)
+
+        self.main_canvas.bind("<Configure>", _configure_canvas)
 
         # Pack scrollbar and canvas
         scrollbar.pack(side="right", fill="y")
